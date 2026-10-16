@@ -1,0 +1,44 @@
+services:
+  authi:
+    build: .
+    image: authi:local
+    restart: unless-stopped
+    environment:
+      AUTHI_ISSUER_URL: ${AUTHI_ISSUER_URL:?Set AUTHI_ISSUER_URL in .env}
+      AUTHI_COOKIE_DOMAIN: ${AUTHI_COOKIE_DOMAIN:-}
+      AUTHI_SECRET_KEY: ${AUTHI_SECRET_KEY:?Set AUTHI_SECRET_KEY in .env}
+      AUTHI_TRUST_PROXY: ${AUTHI_TRUST_PROXY:-loopback,linklocal,uniquelocal}
+      PORT: ${PORT:-9000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://authi:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/authi
+    ports:
+      - "127.0.0.1:${AUTHI_HOST_PORT:-9000}:${PORT:-9000}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - authi-internal
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: authi
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authi -d authi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - authi-internal
+
+networks:
+  authi-internal:
+    driver: bridge
+
+volumes:
+  postgres-data:
