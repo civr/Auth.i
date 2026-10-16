@@ -4,6 +4,7 @@
   "scripts": {
     "test": "vitest run",
     "dev": "tsx watch src/server.ts",
+    "mock": "node scripts/serve-mock.mjs",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "cli": "tsx src/cli.ts",

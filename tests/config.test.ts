@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { loadConfig } from '../src/config.js';
 
 const key = Buffer.alloc(32, 7).toString('base64');
 const base = {
   AUTHI_ISSUER_URL: 'https://auth.example.com/',
   AUTHI_SECRET_KEY: key,
+  DATABASE_URL: 'postgres://authi:authi@db/authi',
+};
+const withoutSecret = {
+  AUTHI_ISSUER_URL: 'https://auth.example.com/',
   DATABASE_URL: 'postgres://authi:authi@db/authi',
 };
 
@@ -28,6 +35,31 @@ describe('loadConfig', () => {
 
   it('rejects a secret key that is not 32 bytes', () => {
     expect(() => loadConfig({ ...base, AUTHI_SECRET_KEY: 'c2hvcnQ=' })).toThrow(/AUTHI_SECRET_KEY/);
+  });
+
+  it('generates and reuses a persistent secret key when none is provided', () => {
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'authi-config-'));
+    try {
+      const first = loadConfig(withoutSecret, { dataDir });
+      const second = loadConfig(withoutSecret, { dataDir });
+      expect(first.secretKey).toHaveLength(32);
+      expect(second.secretKey).toEqual(first.secretKey);
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses local defaults with only the persisted database password', () => {
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'authi-defaults-'));
+    try {
+      writeFileSync(path.join(dataDir, 'postgres-password'), 'local-password\n');
+      const c = loadConfig({}, { dataDir });
+      expect(c.issuerUrl).toBe('http://localhost:9000');
+      expect(c.databaseUrl).toBe('postgres://authi:local-password@postgres:5432/authi');
+      expect(c.secretKey).toHaveLength(32);
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
   });
 
   it('requires a bootstrap password when a bootstrap user is set', () => {

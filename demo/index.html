@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f3f5f2">
+    <title>Auth.i | Local preview</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="theme.css">
+    <script src="mock.js" defer></script>
+  </head>
+  <body>
+    <div class="preview-ribbon"><span class="status-dot"></span> LOCAL PREVIEW <span class="ribbon-divider"></span> Sample data only</div>
+
+    <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
+      <div class="login-story">
+        <a class="brand brand-light" href="#" aria-label="Auth.i home">
+          <span class="brand-mark">a<span>.</span></span><span>auth.i</span>
+        </a>
+        <div class="story-copy">
+          <p class="eyebrow">YOUR ACCESS, IN ONE PLACE</p>
+          <h1>One sign-in.<br>Everywhere you<br>belong.</h1>
+          <p class="story-note">A quieter way to connect your people with the tools they need.</p>
+        </div>
+        <div class="story-bottom">
+          <div class="orbit-scene" aria-hidden="true">
+            <div class="orbit orbit-one"></div>
+            <div class="orbit orbit-two"></div>
+            <div class="orbit-core">a<span>.</span></div>
+            <span class="orbit-label label-one">people</span>
+            <span class="orbit-label label-two">apps</span>
+            <span class="orbit-label label-three">identity</span>
+          </div>
+          <p>Identity infrastructure for your corner of the internet.</p>
+        </div>
+      </div>
+
+      <div class="login-panel">
+        <div class="mobile-brand brand">
+          <span class="brand-mark">a<span>.</span></span><span>auth.i</span>
+        </div>
+        <div class="login-card">
+          <div class="panel-heading">
+            <p class="eyebrow">WELCOME BACK</p>
+            <h2 id="loginTitle">Sign in to Auth.i</h2>
+            <p class="subtle">Use a sample account to explore the preview.</p>
+          </div>
+          <form id="loginForm" novalidate>
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required>
+            <label for="password">Password</label>
+            <div class="password-wrap">
+              <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+              <button class="reveal-button" id="togglePassword" type="button" aria-label="Show password">Show</button>
+            </div>
+            <p class="form-error" id="loginError" role="alert" hidden></p>
+            <button class="button button-primary sign-in-button" type="submit">Sign in <span aria-hidden="true">&rarr;</span></button>
+          </form>
+          <div class="demo-accounts">
+            <div class="demo-heading"><span>TRY A SAMPLE ACCOUNT</span><span class="demo-password">Password: <code>authi-demo</code></span></div>
+            <button class="account-choice" type="button" data-email="admin@authi.local">
+              <span class="account-avatar avatar-amber">JM</span>
+              <span class="account-meta"><strong>Jordan Morgan</strong><small>Administrator</small></span>
+              <span class="choice-arrow" aria-hidden="true">&rarr;</span>
+            </button>
+            <button class="account-choice" type="button" data-email="alex@authi.local">
+              <span class="account-avatar avatar-teal">AL</span>
+              <span class="account-meta"><strong>Alex Lee</strong><small>Member</small></span>
+              <span class="choice-arrow" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+          <p class="privacy-note"><span aria-hidden="true">i</span> Nothing you enter is sent to a server.</p>
+        </div>
+        <footer class="login-footer"><span>Auth.i preview build</span><span>Local prototype · 2026</span></footer>
+      </div>
+    </section>
+
+    <div class="app-shell" id="appShell" hidden>
+      <aside class="sidebar" id="sidebar">
+        <a class="brand sidebar-brand" href="#home" aria-label="Auth.i dashboard">
+          <span class="brand-mark">a<span>.</span></span><span>auth.i</span>
+        </a>
+        <div class="workspace-label">WORKSPACE</div>
+        <div class="workspace-switcher"><span class="workspace-glyph">H</span><span><strong>Harbor House</strong><small>Personal workspace</small></span><span class="switcher-chevron">&#9662;</span></div>
+        <nav class="side-nav" aria-label="Main navigation">
+          <p class="nav-caption">YOUR SPACE</p>
+          <button class="nav-link is-active" data-page="home"><span class="nav-symbol">&#9633;</span> Overview</button>
+          <button class="nav-link" data-page="apps"><span class="nav-symbol">&#10022;</span> My applications <span class="nav-count">5</span></button>
+          <div class="admin-nav" id="adminNav" hidden>
+            <p class="nav-caption nav-caption-admin">MANAGE</p>
+            <button class="nav-link" data-page="admin"><span class="nav-symbol">&#9673;</span> Admin overview</button>
+            <button class="nav-link" data-page="users"><span class="nav-symbol">&#9787;</span> Users <span class="nav-count">12</span></button>
+            <button class="nav-link" data-page="applications"><span class="nav-symbol">&#9638;</span> Applications</button>
+          </div>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="secure-note"><span class="secure-icon">&#10003;</span><span><strong>Private by design</strong><small>Your demo stays in this tab.</small></span></div>
+          <button class="profile-button" id="profileButton" type="button">
+            <span class="account-avatar avatar-amber" id="profileAvatar">JM</span>
+            <span class="profile-meta"><strong id="profileName">Jordan Morgan</strong><small id="profileRole">Administrator</small></span>
+            <span class="profile-menu-mark">Sign out</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <button class="mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">&#9776;</button>
+          <div class="breadcrumbs"><span>Harbor House</span><span class="crumb-divider">/</span><strong id="pageCrumb">Overview</strong></div>
+          <div class="topbar-right"><span class="preview-chip"><span class="status-dot"></span> MOCK MODE</span><button class="help-button" id="helpButton" type="button">Preview notes</button></div>
+        </header>
+        <section class="page-content" id="pageContent" aria-live="polite"></section>
+        <footer class="page-footer"><span>Auth.i <span class="footer-dot">&middot;</span> Identity for your homelab</span><span>Prototype data resets when you reload.</span></footer>
+      </main>
+      <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+      <div class="modal-backdrop" id="modalBackdrop" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+          <button class="modal-close" id="modalClose" type="button" aria-label="Close dialog">&times;</button>
+          <div id="modalContent"></div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

@@ -12,19 +12,7 @@ provider.
 
 ## Start
 
-Create the environment file and replace both generated secrets:
-
-```sh
-cp .env.example .env
-openssl rand -base64 32
-openssl rand -hex 24
-```
-
-Set `AUTHI_ISSUER_URL` to the public HTTPS URL that the reverse proxy will serve. Use the first
-generated value for `AUTHI_SECRET_KEY` and the second for `POSTGRES_PASSWORD`. The database password
-is hexadecimal so it can safely be embedded in `DATABASE_URL`.
-
-Start the services:
+No environment file is required for a fresh local deployment:
 
 ```sh
 docker compose up -d --build
@@ -32,8 +20,10 @@ docker compose ps
 curl http://127.0.0.1:9000/healthz
 ```
 
-The health endpoint returns `{"status":"ok"}` only while Postgres is reachable. The app service
-waits for Postgres's health check before starting. To inspect logs or stop the deployment:
+On first start, Compose creates a random Postgres password and Auth.i creates a random encryption
+key. Both are kept in the persistent `authi-data` volume. The local issuer URL defaults to
+`http://localhost:9000`. The health endpoint returns `{"status":"ok"}` while Postgres is reachable.
+The app waits for Postgres's health check before starting. To inspect logs or stop the deployment:
 
 ```sh
 docker compose logs -f authi
@@ -42,6 +32,24 @@ docker compose down
 
 `docker compose down` preserves the `postgres-data` volume. To delete the database as well, remove
 that volume explicitly with `docker compose down --volumes`.
+
+This checkout still has no in-app settings or authentication UI; it only provides configuration
+loading and `/healthz`. Until those screens are implemented, optional `.env` overrides are available
+for deployments behind a reverse proxy. When reusing a database volume created by an older version,
+keep its original `POSTGRES_PASSWORD` available in `.env` so the generated password file matches it.
+
+## Browser mock
+
+To preview the sign-in and dashboard experience without starting Postgres, run:
+
+```sh
+npm run mock
+```
+
+Open `http://127.0.0.1:4173`. The mock includes sample user and admin accounts, a user dashboard,
+and a compact admin view. Use the demo password shown on the sign-in page. All data and actions are
+browser-only and reset on reload; this is a visual prototype, not real authentication or an API.
+The preview server binds only to loopback.
 
 ## Service roles
 
