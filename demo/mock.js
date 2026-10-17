@@ -1,152 +1,162 @@
-const demoPassword = 'authi-demo';
+const demoPassword = 'keystone-demo';
+const baseUrl = 'https://keystone.harbor.test';
+const issuer = `${baseUrl}/oidc`;
+const tones = ['blue', 'green', 'amber', 'violet', 'rose', 'slate'];
+
 const users = [
-  { id: 1, name: 'Jordan Morgan', email: 'admin@authi.local', role: 'Administrator', status: 'Active', initials: 'JM', avatar: 'avatar-amber', admin: true },
-  { id: 2, name: 'Alex Lee', email: 'alex@authi.local', role: 'Member', status: 'Active', initials: 'AL', avatar: 'avatar-teal', admin: false },
-  { id: 3, name: 'Priya Shah', email: 'priya@authi.local', role: 'Member', status: 'Active', initials: 'PS', avatar: 'avatar-coral', admin: false },
-  { id: 4, name: 'Noah Bennett', email: 'noah@authi.local', role: 'Member', status: 'Active', initials: 'NB', avatar: 'avatar-blue', admin: false },
-  { id: 5, name: 'Mina Park', email: 'mina@authi.local', role: 'Member', status: 'Active', initials: 'MP', avatar: 'avatar-lilac', admin: false },
+  { name: 'Jordan Morgan', email: 'jordan@harbor.test', admin: true, status: 'Active', mfa: 'Passkey', lastSeen: 'Just now', tone: 'blue' },
+  { name: 'Alex Lee', email: 'alex@harbor.test', admin: false, status: 'Active', mfa: 'Passkey', lastSeen: 'Today, 08:41', tone: 'green' },
+  { name: 'Priya Shah', email: 'priya@harbor.test', admin: false, status: 'Active', mfa: 'Authenticator app', lastSeen: 'Yesterday', tone: 'violet' },
+  { name: 'Noah Bennett', email: 'noah@harbor.test', admin: false, status: 'Active', mfa: 'Not enrolled', lastSeen: '3 days ago', tone: 'amber' },
+  { name: 'Mina Park', email: 'mina@harbor.test', admin: false, status: 'Active', mfa: 'Authenticator app', lastSeen: 'Today, 07:15', tone: 'rose' },
+  { name: 'Sam Rivera', email: 'sam@harbor.test', admin: true, status: 'Active', mfa: 'Passkey', lastSeen: 'Yesterday', tone: 'slate' },
+  { name: 'Elena Costa', email: 'elena@harbor.test', admin: false, status: 'Invited', mfa: 'Not enrolled', lastSeen: 'Never', tone: 'green' },
+  { name: 'Omar Haddad', email: 'omar@harbor.test', admin: false, status: 'Active', mfa: 'Not enrolled', lastSeen: 'Last week', tone: 'blue' },
 ];
 const applications = [
-  { name: 'Outline', detail: 'Team knowledge base', symbol: 'O', tone: 'green', category: 'Documentation', address: 'outline.harbor.test' },
-  { name: 'Grafana', detail: 'Metrics & observability', symbol: 'G', tone: 'coral', category: 'Monitoring', address: 'metrics.harbor.test' },
-  { name: 'Forgejo', detail: 'Code, issues & reviews', symbol: 'F', tone: 'blue', category: 'Development', address: 'code.harbor.test' },
-  { name: 'Paperless', detail: 'Documents & records', symbol: 'P', tone: 'yellow', category: 'Operations', address: 'docs.harbor.test' },
-  { name: 'Immich', detail: 'Shared photo library', symbol: 'I', tone: 'lilac', category: 'Personal', address: 'photos.harbor.test' },
+  { name: 'Outline', detail: 'Team knowledge base', tone: 'green', host: 'outline.harbor.test', method: 'OIDC' },
+  { name: 'Grafana', detail: 'Metrics and dashboards', tone: 'amber', host: 'metrics.harbor.test', method: 'OIDC' },
+  { name: 'Forgejo', detail: 'Code and reviews', tone: 'slate', host: 'code.harbor.test', method: 'OIDC' },
+  { name: 'Paperless', detail: 'Documents and records', tone: 'violet', host: 'docs.harbor.test', method: 'Forward auth' },
+  { name: 'Immich', detail: 'Shared photo library', tone: 'rose', host: 'photos.harbor.test', method: 'OIDC' },
+  { name: 'Home Assistant', detail: 'Home automation', tone: 'blue', host: 'home.harbor.test', method: 'Forward auth' },
 ];
-const state = { user: null, page: 'home', addedUsers: [], search: '', roleFilter: 'all', toastTimer: null };
-const loginScreen = document.querySelector('#loginScreen');
-const appShell = document.querySelector('#appShell');
-const loginForm = document.querySelector('#loginForm');
-const emailInput = document.querySelector('#email');
-const passwordInput = document.querySelector('#password');
-const loginError = document.querySelector('#loginError');
-const pageContent = document.querySelector('#pageContent');
-const modalBackdrop = document.querySelector('#modalBackdrop');
-const modalContent = document.querySelector('#modalContent');
-const toast = document.querySelector('#toast');
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+const state = { user: null, page: 'home', appSearch: '', userSearch: '', filter: 'all', addedUsers: [], toastTimer: null };
+const $ = (selector) => document.querySelector(selector);
+const loginScreen = $('#loginScreen');
+const appShell = $('#appShell');
+const loginForm = $('#loginForm');
+const emailInput = $('#email');
+const passwordInput = $('#password');
+const loginError = $('#loginError');
+const pageContent = $('#pageContent');
+const modalBackdrop = $('#modalBackdrop');
+const modalContent = $('#modalContent');
+const toast = $('#toast');
+const sidebar = $('#sidebar');
+const navScrim = $('#navScrim');
+const adminPages = new Set(['applications', 'users']);
+
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
+const allUsers = () => [...users, ...state.addedUsers];
+const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+const avatar = (user) => `<span class="avatar tone-${user.tone}">${esc(initials(user.name))}</span>`;
+const appLogo = (app, small = false) => `<span class="app-logo tone-${app.tone}${small ? ' app-logo-sm' : ''}" aria-hidden="true">${esc(app.name[0])}</span>`;
+const pill = (text, kind) => `<span class="pill pill-${kind}">${esc(text)}</span>`;
+const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
 
-function accountFor(email) {
-  if (email === 'admin@authi.local') return users[0];
-  if (email === 'alex@authi.local') return users[1];
-  return null;
+function randomToken(length) {
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (b) => 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 56]).join('');
 }
 
 function showToast(message) {
   toast.textContent = message;
   toast.hidden = false;
   clearTimeout(state.toastTimer);
-  state.toastTimer = setTimeout(() => { toast.hidden = true; }, 2800);
+  state.toastTimer = setTimeout(() => { toast.hidden = true; }, 3200);
 }
 
-function appCard(app) {
-  return `<article class="application-card">
-    <div class="app-card-top"><span class="app-icon app-icon-${app.tone}">${escapeHtml(app.symbol)}</span><button class="app-card-arrow" type="button" data-launch="${escapeHtml(app.name)}" aria-label="Open ${escapeHtml(app.name)}">&#8599;</button></div>
-    <h3>${escapeHtml(app.name)}</h3><p>${escapeHtml(app.detail)}</p>
-    <div class="app-card-foot"><span>${escapeHtml(app.category)}</span><span class="access-pill">Connected</span></div>
-  </article>`;
-}
-
-function heading(kicker, title, detail, action = '') {
-  return `<div class="page-heading"><div><p class="eyebrow">${kicker}</p><h1>${title}</h1><p>${detail}</p></div>${action ? `<div class="heading-actions">${action}</div>` : ''}</div>`;
+function heading(title, detail, actions = '') {
+  return `<div class="page-heading"><div><h1>${title}</h1><p>${detail}</p></div>${actions ? `<div class="heading-actions">${actions}</div>` : ''}</div>`;
 }
 
 function homePage() {
-  const firstName = escapeHtml(state.user.name.split(' ')[0]);
-  return `${heading('YOUR WORKSPACE', `Good morning, ${firstName}`, 'Your connected tools, ready when you are.')}
-    <section class="welcome-band"><div class="welcome-copy"><p class="eyebrow">HARBOR HOUSE WORKSPACE</p><h2>Everything you need.<br>One secure place.</h2><p>Signed in as ${escapeHtml(state.user.email)}</p></div><span class="welcome-stamp">HH / 01</span></section>
-    <div class="section-head"><h2>Your applications</h2><button class="text-link" type="button" data-page="apps">View all <span aria-hidden="true">&rarr;</span></button></div>
-    <div class="application-grid">${applications.slice(0, 3).map(appCard).join('')}</div>
-    <div class="home-lower">
-      <section class="surface-panel"><div class="surface-panel-heading"><h2>Recent activity</h2><span>JUST FOR YOU</span></div><div class="activity-list">
-        <div class="activity-row"><span class="activity-icon">&#10003;</span><span class="activity-copy"><strong>Signed in successfully</strong><small>Local account &#183; this browser</small></span><span class="activity-time">NOW</span></div>
-        <div class="activity-row"><span class="activity-icon">&#8599;</span><span class="activity-copy"><strong>Workspace access verified</strong><small>Harbor House &#183; 3 applications</small></span><span class="activity-time">TODAY</span></div>
-      </div></section>
-      <section class="surface-panel"><div class="surface-panel-heading"><h2>Your team</h2><span>HARBOR HOUSE</span></div><div class="membership-content"><p>Your account is part of the Harbor House workspace.</p><div class="member-stack"><span class="account-avatar avatar-amber">JM</span><span class="account-avatar avatar-teal">AL</span><span class="account-avatar avatar-coral">PS</span><span class="account-avatar avatar-blue">NB</span><span class="member-total">+8 members</span></div></div></section>
-    </div>`;
+  const query = state.appSearch.trim().toLowerCase();
+  const apps = applications.filter((app) => `${app.name} ${app.detail} ${app.host}`.toLowerCase().includes(query));
+  const tiles = apps.map((app) => `<button class="app-tile" type="button" data-launch="${esc(app.name)}">${appLogo(app)}<span class="app-name">${esc(app.name)}</span><span class="app-host">${esc(app.host)}</span></button>`).join('');
+  const firstName = esc(state.user.name.split(' ')[0]);
+  const body = apps.length
+    ? `<div class="app-grid">${tiles}</div>`
+    : `<div class="panel empty"><strong>No apps match "${esc(state.appSearch)}"</strong>Try another name, or ask an admin to connect it.</div>`;
+  return `${heading('My apps', `Welcome back, ${firstName}. You're signed in once; every app below opens without another password.`)}
+    <section class="section"><div class="section-head"><h2>${query ? 'Search results' : 'All apps'}</h2><span>${apps.length} of ${applications.length}</span></div>${body}</section>`;
 }
 
-function appsPage() {
-  return `${heading('YOUR ACCESS', 'My applications', 'Tools connected to your Harbor House account.')}
-    <div class="application-grid">${applications.map(appCard).join('')}</div>
-    <p class="demo-footnote">These app links are illustrative. No external service is opened in this preview.</p>`;
+function applicationsPage() {
+  const rows = applications.map((app) => `<tr>
+    <td><div class="cell-main">${appLogo(app, true)}<span><strong>${esc(app.name)}</strong><small>${esc(app.detail)}</small></span></div></td>
+    <td><span class="tag${app.method === 'OIDC' ? ' tag-accent' : ''}">${esc(app.method)}</span></td>
+    <td><span class="mono">${esc(app.host)}</span></td>
+    <td>${pill('Connected', 'ok')}</td>
+    <td><button class="button button-secondary button-small" type="button" data-settings="${esc(app.name)}">Settings</button></td>
+  </tr>`).join('');
+  return `${heading('Applications', 'Apps that send people to Keystone to sign in.', '<button class="button button-primary" type="button" data-connect>Connect app</button>')}
+    <ol class="how-it-works">
+      <li><b>1</b><strong>Name the app</strong><span>Its name and the address people open.</span></li>
+      <li><b>2</b><strong>Pick how it signs in</strong><span>OIDC if the app has an SSO setting. Forward auth if it doesn't.</span></li>
+      <li><b>3</b><strong>Paste the settings</strong><span>Copy the values Keystone gives you into the app or your proxy.</span></li>
+    </ol>
+    <section class="panel"><div class="table-wrap"><table class="table">
+      <thead><tr><th>Application</th><th>Sign-in method</th><th>Address</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div></section>`;
 }
 
-function avatar(user) {
-  return `<span class="account-avatar ${user.avatar}">${escapeHtml(user.initials)}</span>`;
+function usersPage() {
+  const people = allUsers();
+  const query = state.userSearch.trim().toLowerCase();
+  const filters = {
+    all: () => true,
+    admins: (user) => user.admin,
+    nomfa: (user) => user.mfa === 'Not enrolled',
+    invited: (user) => user.status === 'Invited',
+  };
+  const labels = { all: 'Everyone', admins: 'Admins', nomfa: 'No second factor', invited: 'Invited' };
+  const chips = Object.keys(filters).map((key) => `<button class="chip${state.filter === key ? ' is-active' : ''}" type="button" data-filter="${key}">${labels[key]}<span>${people.filter(filters[key]).length}</span></button>`).join('');
+  const shown = people.filter((user) => filters[state.filter](user) && `${user.name} ${user.email}`.toLowerCase().includes(query));
+  const rows = shown.map((user) => `<tr>
+    <td><div class="cell-main">${avatar(user)}<span><strong>${esc(user.name)}</strong><small>${esc(user.email)}</small></span></div></td>
+    <td>${user.admin ? '<span class="tag tag-accent">Admin</span>' : '<span class="tag">Member</span>'}</td>
+    <td>${user.mfa === 'Not enrolled' ? pill('Not enrolled', 'warn') : esc(user.mfa)}</td>
+    <td>${user.status === 'Active' ? pill('Active', 'ok') : pill(user.status, 'neutral')}</td>
+    <td>${esc(user.lastSeen)}</td>
+  </tr>`).join('') || '<tr><td colspan="5"><div class="empty">No people match this filter.</div></td></tr>';
+  return `${heading('People', 'Everyone who can sign in to Harbor House apps.', '<button class="button button-primary" type="button" data-invite>Invite person</button>')}
+    <section class="panel">
+      <div class="toolbar">${chips}<label class="search-field" for="userSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="userSearch" type="search" placeholder="Search people" aria-label="Search people" value="${esc(state.userSearch)}"></label></div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>Person</th><th>Role</th><th>Second factor</th><th>Status</th><th>Last sign-in</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </section>`;
 }
 
-function shortUserRow(user) {
-  return `<tr><td><div class="user-cell">${avatar(user)}<span><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.email)}</small></span></div></td><td><span class="role-tag ${user.admin ? 'admin' : ''}">${escapeHtml(user.role)}</span></td><td><span class="status-tag">${escapeHtml(user.status)}</span></td></tr>`;
-}
-
-function quickApps() {
-  return applications.slice(0, 3).map((app) => `<div class="quick-row"><span class="app-icon app-icon-${app.tone}">${escapeHtml(app.symbol)}</span><span class="quick-row-copy"><strong>${escapeHtml(app.name)}</strong><small>${escapeHtml(app.category)}</small></span><span class="quick-state">Active</span></div>`).join('');
-}
-
-function adminPage() {
-  const visibleUsers = users.slice(0, 4);
-  return `${heading('WORKSPACE ADMIN', 'Workspace overview', 'A quick look at people and connected applications.', '<button class="button button-outline button-compact" data-page="users" type="button">Manage users</button><button class="button button-primary button-compact" data-invite type="button">+ Invite user</button>')}
-    <div class="stats-grid">
-      <article class="stat-card"><span class="stat-label">Active users</span><div class="stat-value-row"><strong class="stat-value">${12 + state.addedUsers.length}</strong><span class="stat-change">+2 this month</span></div><div class="stat-footnote">Across 3 access groups</div></article>
-      <article class="stat-card"><span class="stat-label">Connected apps</span><div class="stat-value-row"><strong class="stat-value">${applications.length}</strong><span class="stat-change">All healthy</span></div><div class="stat-footnote">OIDC &amp; forward-auth</div></article>
-      <article class="stat-card"><span class="stat-label">Identity sources</span><div class="stat-value-row"><strong class="stat-value">2</strong><span class="stat-change">Connected</span></div><div class="stat-footnote">Local directory + Entra ID</div></article>
-    </div>
-    <div class="admin-grid"><section class="surface-panel table-panel"><div class="table-toolbar"><h2>People</h2><button class="text-link" data-page="users" type="button">All users &rarr;</button></div><table class="data-table"><thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th></tr></thead><tbody>${visibleUsers.map(shortUserRow).join('')}</tbody></table></section>
-    <section class="surface-panel quick-panel"><h2>Connected applications</h2>${quickApps()}</section></div>`;
-}
-
-function userPage() {
-  const query = state.search.trim().toLowerCase();
-  const allUsers = [...users, ...state.addedUsers];
-  const filtered = allUsers.filter((user) => {
-    const matchesSearch = `${user.name} ${user.email} ${user.role}`.toLowerCase().includes(query);
-    const matchesRole = state.roleFilter === 'all' || (state.roleFilter === 'admin' ? user.admin : user.status === 'Active');
-    return matchesSearch && matchesRole;
-  });
-  return `${heading('WORKSPACE ADMIN', 'People', 'Manage who can sign in to Harbor House.', '<button class="button button-primary button-compact" data-invite type="button">+ Invite user</button>')}
-    <div class="filter-bar"><button class="filter-chip ${state.roleFilter === 'all' ? 'is-active' : ''}" type="button" data-filter="all">All users <span>${allUsers.length}</span></button><button class="filter-chip ${state.roleFilter === 'admin' ? 'is-active' : ''}" type="button" data-filter="admin">Admins <span>1</span></button><button class="filter-chip ${state.roleFilter === 'active' ? 'is-active' : ''}" type="button" data-filter="active">Active <span>${allUsers.length}</span></button></div>
-    <section class="surface-panel full-table-panel"><div class="table-toolbar"><h2>Workspace members</h2><label class="search-wrap"><span class="search-mark" aria-hidden="true">&#9906;</span><input class="search-input" id="userSearch" type="search" placeholder="Search people" value="${escapeHtml(state.search)}" aria-label="Search people"></label><span class="toolbar-count">${filtered.length} shown</span></div><table class="data-table"><thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th><th>LAST SIGN-IN</th></tr></thead><tbody>${filtered.map((user) => `<tr><td><div class="user-cell">${avatar(user)}<span><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.email)}</small></span></div></td><td><span class="role-tag ${user.admin ? 'admin' : ''}">${escapeHtml(user.role)}</span></td><td><span class="status-tag">${escapeHtml(user.status)}</span></td><td>${user.id === 1 ? 'Just now' : 'Today'}</td></tr>`).join('') || '<tr><td colspan="4"><div class="empty-state">No people match that search.</div></td></tr>'}</tbody></table></section>
-    <p class="demo-footnote">Changes in this view exist only until this page is reloaded.</p>`;
-}
-
-function applicationAdminPage() {
-  const cards = applications.map((app) => `<article class="admin-app-card"><div class="admin-app-head"><span class="app-icon app-icon-${app.tone}">${escapeHtml(app.symbol)}</span><span><h3>${escapeHtml(app.name)}</h3><p>${escapeHtml(app.detail)}</p></span><span class="quick-state">Active</span></div><div class="admin-app-meta"><span>TYPE<strong>${escapeHtml(app.category)}</strong></span><span>HOST<strong>${escapeHtml(app.address)}</strong></span></div></article>`).join('');
-  return `${heading('WORKSPACE ADMIN', 'Applications', 'Services available to members of this workspace.', '<button class="button button-primary button-compact" data-connect type="button">+ Connect application</button>')}
-    <div class="stats-grid"><article class="stat-card"><span class="stat-label">Connected</span><div class="stat-value-row"><strong class="stat-value">${applications.length}</strong><span class="stat-change">Healthy</span></div><div class="stat-footnote">All configured applications</div></article><article class="stat-card"><span class="stat-label">Sign-in method</span><div class="stat-value-row"><strong class="stat-value stat-value-text">OIDC</strong><span class="stat-change">Encrypted</span></div><div class="stat-footnote">Secrets are hidden in this preview</div></article><article class="stat-card"><span class="stat-label">Member access</span><div class="stat-value-row"><strong class="stat-value">12</strong><span class="stat-change">Scoped</span></div><div class="stat-footnote">Access follows workspace policy</div></article></div>
-    <div class="section-head"><h2>All applications</h2><span class="subtle">${applications.length} configured</span></div><div class="application-admin-grid">${cards}</div>`;
-}
-
-const pages = { home: homePage, apps: appsPage, admin: adminPage, users: userPage, applications: applicationAdminPage };
-const pageNames = { home: 'Overview', apps: 'My applications', admin: 'Admin overview', users: 'Users', applications: 'Applications' };
+const pages = { home: homePage, applications: applicationsPage, users: usersPage };
 
 function renderPage() {
-  if (!pages[state.page]) state.page = 'home';
-  document.querySelector('#pageCrumb').textContent = pageNames[state.page];
-  pageContent.innerHTML = pages[state.page]();
+  if (!pages[state.page] || (adminPages.has(state.page) && !state.user.admin)) state.page = 'home';
+  pageContent.innerHTML = `<div class="page">${pages[state.page]()}</div>`;
   document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('is-active', link.dataset.page === state.page));
-  document.querySelector('#sidebar').classList.remove('is-open');
+  $('#appCount').textContent = applications.length;
+  $('#peopleCount').textContent = allUsers().length;
+  closeNav();
+}
+
+function goTo(page) {
+  state.page = page;
+  renderPage();
+  window.scrollTo(0, 0);
 }
 
 function signIn(user) {
   state.user = user;
   state.page = 'home';
+  state.appSearch = '';
+  $('#appSearch').value = '';
   loginScreen.hidden = true;
   appShell.hidden = false;
-  document.querySelector('#adminNav').hidden = !user.admin;
-  document.querySelector('#profileAvatar').className = `account-avatar ${user.avatar}`;
-  document.querySelector('#profileAvatar').textContent = user.initials;
-  document.querySelector('#profileName').textContent = user.name;
-  document.querySelector('#profileRole').textContent = user.role;
+  $('#adminNav').hidden = !user.admin;
+  $('#profileAvatar').className = `avatar tone-${user.tone}`;
+  $('#profileAvatar').textContent = initials(user.name);
+  $('#profileName').textContent = user.name;
+  $('#profileRole').textContent = user.admin ? 'Administrator' : 'Member';
   renderPage();
 }
 
 function signOut() {
   state.user = null;
-  state.page = 'home';
+  closeModal();
   appShell.hidden = true;
   loginScreen.hidden = false;
   loginForm.reset();
@@ -154,42 +164,108 @@ function signOut() {
   emailInput.focus();
 }
 
-function openModal(content) {
-  modalContent.innerHTML = content;
-  modalBackdrop.hidden = false;
-  modalContent.querySelector('input')?.focus();
-}
+function openNav() { sidebar.classList.add('is-open'); navScrim.hidden = false; $('#mobileMenu').setAttribute('aria-expanded', 'true'); }
+function closeNav() { sidebar.classList.remove('is-open'); navScrim.hidden = true; $('#mobileMenu').setAttribute('aria-expanded', 'false'); }
 
+function openModal(html) {
+  modalContent.innerHTML = html;
+  modalBackdrop.hidden = false;
+  modalContent.querySelector('input:not([type="radio"])')?.focus();
+}
 function closeModal() {
   modalBackdrop.hidden = true;
   modalContent.innerHTML = '';
 }
 
-function inviteModal() {
-  openModal(`<p class="eyebrow">HARBOR HOUSE</p><h2 id="modalTitle">Invite a teammate</h2><p>Add a sample person to this local preview. No invitation will be sent.</p><form id="inviteForm"><label for="inviteName">Full name</label><input id="inviteName" name="name" placeholder="Taylor Reed" required><label for="inviteEmail">Email address</label><input id="inviteEmail" name="email" type="email" placeholder="taylor@example.com" required><div class="modal-actions"><button class="button button-outline button-compact" type="button" data-close-modal>Cancel</button><button class="button button-primary button-compact" type="submit">Add to preview</button></div></form><p class="demo-footnote">This sample user disappears when you reload.</p>`);
+function copyRow(label, value, secret = false) {
+  return `<div class="setting"><dt>${label}</dt><dd><code${secret ? ' data-secret' : ''}>${esc(value)}</code><button class="copy-button" type="button" data-copy="${esc(value)}">Copy</button></dd></div>`;
 }
 
-function createInvite(form) {
-  const data = new FormData(form);
-  const name = String(data.get('name') ?? '').trim();
-  const email = String(data.get('email') ?? '').trim().toLowerCase();
-  if (!name || !email.includes('@')) return;
-  if ([...users, ...state.addedUsers].some((user) => user.email.toLowerCase() === email)) {
-    showToast('That email is already in the sample workspace.');
-    return;
-  }
-  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-  state.addedUsers.push({ id: Date.now(), name, email, role: 'Member', status: 'Active', initials, avatar: 'avatar-lilac', admin: false });
-  closeModal();
+function connectStepOne() {
+  openModal(`<p class="steps"><span class="is-current">1 · App</span><span>›</span><span>2 · Settings</span></p>
+    <h2 id="modalTitle">Connect an app</h2>
+    <p class="modal-intro">Keystone becomes the place this app sends people to sign in.</p>
+    <form id="connectForm">
+      <div class="field"><label for="appName">App name</label><input id="appName" name="name" type="text" placeholder="Grafana" required></div>
+      <div class="field"><label for="appUrl">App address</label><input id="appUrl" name="url" type="url" placeholder="https://grafana.harbor.test" required></div>
+      <fieldset class="field method-options">
+        <legend class="field-label">How does it sign in?</legend>
+        <label class="method-option" for="methodOidc"><input id="methodOidc" type="radio" name="method" value="OIDC" checked><strong>OpenID Connect</strong><small>The app has an "SSO", "OAuth" or "OpenID" setting.</small></label>
+        <label class="method-option" for="methodProxy"><input id="methodProxy" type="radio" name="method" value="Forward auth"><strong>Forward auth</strong><small>The app has no SSO setting. Your reverse proxy asks Keystone first.</small></label>
+      </fieldset>
+      <div class="field" id="redirectField"><label for="appRedirect">Redirect URI</label><input id="appRedirect" name="redirect" type="url" placeholder="https://grafana.harbor.test/login/generic_oauth"><p class="field-hint">The callback address from the app's SSO docs. It must match exactly.</p></div>
+      <div class="modal-actions"><button class="button button-secondary" type="button" data-close-modal>Cancel</button><button class="button button-primary" type="submit">Continue</button></div>
+    </form>`);
+}
+
+function connectStepTwo({ name, url, method, redirect }) {
+  const host = new URL(url).host;
+  const slug = slugify(name);
+  const app = { name, detail: method === 'OIDC' ? 'Connected with OIDC' : 'Protected by forward auth', tone: tones[applications.length % tones.length], host, method };
+  applications.push(app);
   renderPage();
-  showToast(`${name} added to this preview.`);
+  let body;
+  if (method === 'OIDC') {
+    body = `<p class="modal-intro">Paste these into ${esc(name)}'s OpenID Connect settings.</p>
+      <dl class="settings-list">
+        ${copyRow('Issuer URL', issuer)}
+        ${copyRow('Discovery URL', `${issuer}/.well-known/openid-configuration`)}
+        ${copyRow('Client ID', `${slug}-${randomToken(6).toLowerCase()}`)}
+        ${copyRow('Client secret', randomToken(40), true)}
+        ${copyRow('Redirect URI (registered)', redirect)}
+        ${copyRow('Scopes', 'openid profile email groups')}
+      </dl>
+      <p class="callout">The client secret is shown once. Store it in ${esc(name)} now.</p>`;
+  } else {
+    const snippet = `${host} {\n  forward_auth keystone:9000 {\n    uri /outpost/auth\n    copy_headers X-Authi-User X-Authi-Email X-Authi-Name X-Authi-Groups\n  }\n  reverse_proxy ${slug}:80\n}`;
+    body = `<p class="modal-intro">Add this to your Caddyfile. Caddy asks Keystone before every request to ${esc(host)}.</p>
+      <div class="setting"><div class="snippet-head"><span class="field-label">Caddyfile</span><button class="copy-button" type="button" data-copy="${esc(snippet)}">Copy</button></div><pre class="snippet">${esc(snippet)}</pre></div>
+      <p class="field-hint">Using Traefik or nginx? Point their auth check at <code>${esc(baseUrl)}/outpost/auth</code>.</p>`;
+  }
+  openModal(`<p class="steps"><span>1 · App</span><span>›</span><span class="is-current">2 · Settings</span></p>
+    <h2 id="modalTitle">${esc(name)} is connected</h2>${body}
+    <div class="modal-actions"><button class="button button-primary" type="button" data-close-modal>Done</button></div>`);
+  showToast(`${name} connected. It now appears in everyone's apps.`);
+}
+
+function settingsModal(name) {
+  const app = applications.find((a) => a.name === name);
+  if (!app) return;
+  const rows = app.method === 'OIDC'
+    ? `${copyRow('Issuer URL', issuer)}${copyRow('Client ID', `${slugify(app.name)}-k3s7qx`)}<div class="setting"><dt>Client secret</dt><dd><code>••••••••••••••••</code><button class="copy-button" type="button" data-rotate="${esc(app.name)}">Rotate</button></dd></div>`
+    : `${copyRow('Auth endpoint', `${baseUrl}/outpost/auth`)}${copyRow('Protected address', app.host)}`;
+  openModal(`<h2 id="modalTitle">${esc(app.name)}</h2><p class="modal-intro">${esc(app.method)} · ${esc(app.host)}</p><dl class="settings-list">${rows}</dl>
+    <div class="modal-actions"><button class="button button-primary" type="button" data-close-modal>Close</button></div>`);
+}
+
+function inviteModal() {
+  openModal(`<h2 id="modalTitle">Invite a person</h2><p class="modal-intro">They get access to every connected app after their first sign-in.</p>
+    <form id="inviteForm">
+      <div class="field"><label for="inviteName">Full name</label><input id="inviteName" name="name" type="text" placeholder="Taylor Reed" required></div>
+      <div class="field"><label for="inviteEmail">Email</label><input id="inviteEmail" name="email" type="email" placeholder="taylor@harbor.test" required></div>
+      <div class="modal-actions"><button class="button button-secondary" type="button" data-close-modal>Cancel</button><button class="button button-primary" type="submit">Send invite</button></div>
+    </form>`);
+}
+
+async function copyText(button) {
+  const value = button.dataset.copy;
+  try {
+    await navigator.clipboard.writeText(value);
+    button.textContent = 'Copied';
+  } catch {
+    const target = button.closest('.setting')?.querySelector('code, .snippet');
+    if (target) window.getSelection().selectAllChildren(target);
+    button.textContent = 'Selected';
+  }
+  setTimeout(() => { button.textContent = 'Copy'; }, 1600);
 }
 
 loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  const account = accountFor(emailInput.value.trim().toLowerCase());
+  const email = emailInput.value.trim().toLowerCase();
+  const account = users.find((user) => user.email === email && user.status === 'Active');
   if (!account || passwordInput.value !== demoPassword) {
-    loginError.textContent = 'That sample sign-in did not match. Choose an account below and use the preview password.';
+    loginError.textContent = 'Email or password is incorrect. Pick a sample account below, or use the password keystone-demo.';
     loginError.hidden = false;
     passwordInput.setAttribute('aria-invalid', 'true');
     return;
@@ -202,64 +278,87 @@ loginForm.addEventListener('submit', (event) => {
 document.querySelectorAll('[data-email]').forEach((button) => button.addEventListener('click', () => {
   emailInput.value = button.dataset.email;
   passwordInput.value = demoPassword;
-  loginError.hidden = true;
   loginForm.requestSubmit();
 }));
 
-document.querySelector('#togglePassword').addEventListener('click', (event) => {
+$('#togglePassword').addEventListener('click', (event) => {
   const show = passwordInput.type === 'password';
   passwordInput.type = show ? 'text' : 'password';
   event.currentTarget.textContent = show ? 'Hide' : 'Show';
   event.currentTarget.setAttribute('aria-label', `${show ? 'Hide' : 'Show'} password`);
 });
-
-document.querySelector('#profileButton').addEventListener('click', signOut);
-document.querySelector('#helpButton').addEventListener('click', () => showToast('This is a local preview. Nothing is saved or sent to Auth.i.'));
-document.querySelector('#mobileMenu').addEventListener('click', () => document.querySelector('#sidebar').classList.toggle('is-open'));
-document.querySelector('#modalClose').addEventListener('click', closeModal);
+$('#helpLink').addEventListener('click', () => showToast('An admin can send you a reset link. In this preview, pick a sample account.'));
+$('#profileButton').addEventListener('click', signOut);
+$('#mobileMenu').addEventListener('click', () => (sidebar.classList.contains('is-open') ? closeNav() : openNav()));
+navScrim.addEventListener('click', closeNav);
+$('#modalClose').addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', (event) => { if (event.target === modalBackdrop) closeModal(); });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { closeModal(); closeNav(); } });
+
+$('#appSearch').addEventListener('input', (event) => {
+  state.appSearch = event.target.value;
+  if (state.page !== 'home') state.page = 'home';
+  renderPage();
+});
 
 document.addEventListener('click', (event) => {
-  const pageButton = event.target.closest('[data-page]');
-  if (pageButton && state.user) {
-    const page = pageButton.dataset.page;
-    if ((page === 'admin' || page === 'users' || page === 'applications') && !state.user.admin) {
-      showToast('Admin preview is available with the administrator sample account.');
-      return;
-    }
-    state.page = page;
-    renderPage();
-    return;
+  const target = event.target;
+  const pageButton = target.closest('[data-page]');
+  if (pageButton && state.user) { goTo(pageButton.dataset.page); return; }
+  const filter = target.closest('[data-filter]');
+  if (filter) { state.filter = filter.dataset.filter; renderPage(); return; }
+  if (target.closest('[data-connect]')) { connectStepOne(); return; }
+  if (target.closest('[data-invite]')) { inviteModal(); return; }
+  if (target.closest('[data-close-modal]')) { closeModal(); return; }
+  const settings = target.closest('[data-settings]');
+  if (settings) { settingsModal(settings.dataset.settings); return; }
+  const copy = target.closest('[data-copy]');
+  if (copy) { copyText(copy); return; }
+  const rotate = target.closest('[data-rotate]');
+  if (rotate) { showToast(`New secret for ${rotate.dataset.rotate} would be shown once here.`); return; }
+  const launch = target.closest('[data-launch]');
+  if (launch) showToast(`${launch.dataset.launch} would open signed in. Sample link, nothing was opened.`);
+});
+
+document.addEventListener('change', (event) => {
+  if (event.target.name === 'method') {
+    const oidc = event.target.value === 'OIDC';
+    $('#redirectField').hidden = !oidc;
+    $('#appRedirect').required = oidc;
   }
-  if (event.target.closest('[data-invite]') && state.user?.admin) { inviteModal(); return; }
-  if (event.target.closest('[data-close-modal]')) { closeModal(); return; }
-  const launch = event.target.closest('[data-launch]');
-  if (launch) { showToast(`${launch.dataset.launch} is a sample app link; no external service was opened.`); return; }
-  if (event.target.closest('[data-connect]')) showToast('Application setup is not connected in this preview.');
 });
 
 document.addEventListener('submit', (event) => {
-  if (event.target.id === 'inviteForm') {
+  const form = event.target;
+  if (form.id === 'connectForm') {
     event.preventDefault();
-    createInvite(event.target);
+    const data = Object.fromEntries(new FormData(form));
+    const name = String(data.name ?? '').trim();
+    if (applications.some((app) => app.name.toLowerCase() === name.toLowerCase())) {
+      showToast(`${name} is already connected.`);
+      return;
+    }
+    connectStepTwo({ name, url: data.url, method: data.method, redirect: data.redirect });
+  }
+  if (form.id === 'inviteForm') {
+    event.preventDefault();
+    const data = new FormData(form);
+    const name = String(data.get('name')).trim();
+    const email = String(data.get('email')).trim().toLowerCase();
+    if (allUsers().some((user) => user.email === email)) { showToast('That email already has access.'); return; }
+    state.addedUsers.push({ name, email, admin: false, status: 'Invited', mfa: 'Not enrolled', lastSeen: 'Never', tone: tones[allUsers().length % tones.length] });
+    closeModal();
+    renderPage();
+    showToast(`Invite ready for ${name}. Nothing is sent in this preview.`);
   }
 });
 
 document.addEventListener('input', (event) => {
-  if (event.target.id === 'userSearch') {
-    const cursor = event.target.selectionStart;
-    state.search = event.target.value;
-    renderPage();
-    const nextSearch = document.querySelector('#userSearch');
-    nextSearch.focus();
-    nextSearch.setSelectionRange(cursor, cursor);
-  }
-});
-
-document.addEventListener('click', (event) => {
-  const filter = event.target.closest('[data-filter]');
-  if (!filter || state.page !== 'users') return;
-  state.roleFilter = filter.dataset.filter;
+  if (event.target.id !== 'userSearch') return;
+  const cursor = event.target.selectionStart;
+  state.userSearch = event.target.value;
   renderPage();
+  const next = $('#userSearch');
+  next.focus();
+  next.setSelectionRange(cursor, cursor);
 });

@@ -8,12 +8,11 @@ const port = Number(process.env.AUTHI_MOCK_PORT ?? 4173);
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
-  ['/theme.css', ['theme.css', 'text/css; charset=utf-8']],
   ['/mock.js', ['mock.js', 'text/javascript; charset=utf-8']],
 ]);
 const headers = {
   'cache-control': 'no-store',
-  'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'none'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'referrer-policy': 'no-referrer',
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
@@ -53,7 +52,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Auth.i browser mock: http://127.0.0.1:${port}`);
+  console.log(`Keystone browser mock: http://127.0.0.1:${port}`);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
