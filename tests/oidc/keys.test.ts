@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createSecretBox } from '../../src/crypto/secrets.js';
 import { RETIRED_KEY_GRACE_MS, SigningKeyService } from '../../src/oidc/keys.js';
+import { createDb } from '../../src/db/db.js';
 import { createTestDb, type TestDb } from '../helpers/db.js';
 
 let t: TestDb;
 let keys: SigningKeyService;
-const box = createSecretBox(Buffer.alloc(32, 5));
+const box = createSecretBox(Buffer.alloc(32, 5), 'signing-keys');
 beforeEach(async () => {
   t = await createTestDb();
   keys = new SigningKeyService(t.db, box);
@@ -36,10 +37,15 @@ describe('SigningKeyService', () => {
     }
   });
 
-  it('is safe under concurrent starts', async () => {
-    await Promise.all([keys.ensureKeys(), keys.ensureKeys(), keys.ensureKeys()]);
-    const rows = await t.db.selectFrom('signing_keys').select('alg').where('status', '=', 'active').execute();
-    expect(rows.map((r) => r.alg).sort()).toEqual(['ES256', 'RS256']);
+  it('is safe under concurrent starts from separate connections', async () => {
+    const dbs = [createDb(t.url), createDb(t.url), createDb(t.url)];
+    try {
+      await Promise.all(dbs.map((d) => new SigningKeyService(d, box).ensureKeys()));
+      const rows = await t.db.selectFrom('signing_keys').select('alg').where('status', '=', 'active').execute();
+      expect(rows.map((r) => r.alg).sort()).toEqual(['ES256', 'RS256']);
+    } finally {
+      await Promise.all(dbs.map((d) => d.destroy()));
+    }
   });
 
   it('rotates keys, keeping retired keys published during the grace period', async () => {
