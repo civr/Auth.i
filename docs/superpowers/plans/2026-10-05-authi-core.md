@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node.js 24, TypeScript 5.9 (NodeNext ESM), Fastify 5, oidc-provider 9, Kysely + pg, Postgres 17, argon2, zod 4, Eta 4, vitest, openid-client 6 (tests only), Docker Compose.
 
-**Spec:** `docs/superpowers/specs/2026-10-04-keystone-design.md`
+**Spec:** `docs/superpowers/specs/2026-10-04-authi-design.md`
 
 **Plan series:** This is plan 1 of 4. Plan 2 = upstream sources (LDAPS/AD, SAML/Entra, OIDC/Entra, AD sync). Plan 3 = SCIM provisioning. Plan 4 = admin UI, user dashboard polish, `/me`, TOTP, app snippets, OpenAPI, cookie+CSRF auth for the API, optional per-app consent screen, client_credentials grant, docs. Everything the spec lists for those areas is out of scope here.
 
