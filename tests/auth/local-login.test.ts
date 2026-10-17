@@ -61,6 +61,17 @@ describe('LocalAuthenticator', () => {
     expect((await auth.authenticate('alice', PASSWORD, '10.0.0.8')).ok).toBe(true);
   });
 
+  it('caps concurrent attempts for one user at maxPerUser', async () => {
+    const total = 3 + 5; // maxPerUser + 5
+    const results = await Promise.all(
+      Array.from({ length: total }, (_, i) => auth.authenticate('alice', 'wrong-password-1', `10.1.0.${i + 1}`)),
+    );
+    const reasons = results.map((r) => (r.ok ? 'ok' : r.reason));
+    const invalid = reasons.filter((r) => r === 'invalid_credentials').length;
+    expect(invalid).toBeLessThanOrEqual(3);
+    expect(reasons.filter((r) => r === 'rate_limited').length).toBe(total - invalid);
+  });
+
   it('clears the per-user counter after a successful login', async () => {
     await auth.authenticate('alice', 'wrong-password-1', '10.0.0.1');
     await auth.authenticate('alice', 'wrong-password-1', '10.0.0.1');

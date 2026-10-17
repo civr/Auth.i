@@ -6,6 +6,13 @@ export interface RateLimitOptions {
   maxPerUser: number;
 }
 
+export interface Reservation {
+  /** True when the reserved attempt (counted with the window's existing attempts) exceeds a limit. */
+  blocked: boolean;
+  /** Ids of the attempt rows this request reserved; release them on success. */
+  ids: string[];
+}
+
 const DEFAULTS: RateLimitOptions = { windowMs: 15 * 60 * 1000, maxPerIp: 30, maxPerUser: 10 };
 
 const ipKey = (ip: string) => `ip:${ip}`;
@@ -21,8 +28,22 @@ export class LoginRateLimiter {
     this.opts = { ...DEFAULTS, ...opts };
   }
 
-  async isBlocked(ip: string, identifier: string): Promise<boolean> {
-    const since = new Date(Date.now() - this.opts.windowMs);
+  /**
+   * Reserves one attempt for the IP and one for the user, then counts the window including them.
+   * Reserving before the password check means concurrent requests cannot all read a low count.
+   * Rows are kept on block and on failure (they are the failed attempts); callers release them on success.
+   */
+  async reserve(ip: string, identifier: string): Promise<Reservation> {
+    const now = new Date();
+    const since = new Date(now.getTime() - this.opts.windowMs);
+    const [ipRow, userRow] = await this.db
+      .insertInto('login_attempts')
+      .values([
+        { key: ipKey(ip), at: now },
+        { key: userKey(identifier), at: now },
+      ])
+      .returning('id')
+      .execute();
     const rows = await this.db
       .selectFrom('login_attempts')
       .select(['key', (eb) => eb.fn.countAll<string>().as('n')])
@@ -30,16 +51,16 @@ export class LoginRateLimiter {
       .where('at', '>', since)
       .groupBy('key')
       .execute();
-    return rows.some((r) =>
-      r.key === ipKey(ip) ? Number(r.n) >= this.opts.maxPerIp : Number(r.n) >= this.opts.maxPerUser,
-    );
+    const count = (key: string) => Number(rows.find((r) => r.key === key)?.n ?? 0);
+    const blocked =
+      count(ipKey(ip)) > this.opts.maxPerIp || count(userKey(identifier)) > this.opts.maxPerUser;
+    return { blocked, ids: [ipRow!.id, userRow!.id] };
   }
 
-  async recordFailure(ip: string, identifier: string): Promise<void> {
-    await this.db
-      .insertInto('login_attempts')
-      .values([{ key: ipKey(ip) }, { key: userKey(identifier) }])
-      .execute();
+  /** Deletes attempt rows reserved by a request that succeeded. */
+  async release(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.db.deleteFrom('login_attempts').where('id', 'in', ids).execute();
   }
 
   async clear(identifier: string): Promise<void> {
