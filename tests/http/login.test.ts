@@ -142,6 +142,19 @@ describe('extra behaviours', () => {
     expect(session.maxAge).toBe(43200);
   });
 
+  it('rejects repeated form fields with the invalid-credentials page, not a 500', async () => {
+    const { csrf } = await loginForm();
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: `csrf=${csrf}&identifier=alice&identifier=bob&password=${TEST_PASSWORD}&password=x`,
+      cookies: { keystone_csrf: csrf },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toContain('Invalid username or password.');
+  });
+
   it('answers /healthz with 503 when the database is unreachable', async () => {
     const bad = createDb('postgres://nobody:nope@127.0.0.1:1/none');
     const app = await buildApp({ ...ctx.services, db: bad });

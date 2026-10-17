@@ -7,7 +7,7 @@ import { currentUser, redirectRules, sessionCookieOptions } from './context.js';
 import { issueCsrfToken, verifyCsrfToken } from './csrf.js';
 import { renderPage } from './views.js';
 
-type LoginBody = Partial<Record<'csrf' | 'rd' | 'identifier' | 'password', string>>;
+type LoginBody = Partial<Record<'csrf' | 'rd' | 'identifier' | 'password', unknown>>;
 
 export function registerLoginRoutes(app: FastifyInstance, s: Services): void {
   const renderLogin = (
@@ -37,8 +37,9 @@ export function registerLoginRoutes(app: FastifyInstance, s: Services): void {
       reply.code(403);
       return renderLogin(req, reply, { rd, error: 'Your sign-in form expired. Please try again.' });
     }
-    const identifier = body.identifier ?? '';
-    const result = await s.localAuth.authenticate(identifier, body.password ?? '', req.ip);
+    const identifier = typeof body.identifier === 'string' ? body.identifier : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    const result = await s.localAuth.authenticate(identifier, password, req.ip);
     if (!result.ok) {
       const limited = result.reason === 'rate_limited';
       reply.code(limited ? 429 : 401);
