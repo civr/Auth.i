@@ -1,0 +1,4 @@
+<% layout('layout') %>
+<h1><%= it.title %></h1>
+<p><%= it.message %></p>
+<p><a href="/">Back to Keystone</a></p>

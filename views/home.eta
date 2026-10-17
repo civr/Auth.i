@@ -1,0 +1,11 @@
+<% layout('layout') %>
+<h1>Hi <%= it.user.displayName %></h1>
+<p class="muted">Signed in as <%= it.user.username %></p>
+<% if (it.apps.length) { %>
+<ul class="apps">
+  <% it.apps.forEach(function (app) { %><li><a href="<%= app.launchUrl %>"><%= app.name %></a></li><% }) %>
+</ul>
+<% } else { %>
+<p class="muted">No applications yet.</p>
+<% } %>
+<form method="post" action="/logout"><button type="submit">Sign out</button></form>
