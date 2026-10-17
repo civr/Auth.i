@@ -43,6 +43,17 @@ export function registerInteractionRoutes(app: FastifyInstance, s: Services): vo
     }
 
     reply.hijack();
-    await provider.interactionFinished(req.raw, reply.raw, result, { mergeWithLastSubmission: false });
+    try {
+      await provider.interactionFinished(req.raw, reply.raw, result, { mergeWithLastSubmission: false });
+    } catch (err) {
+      req.log.error({ err }, 'interaction finish failed');
+      if (!reply.raw.headersSent) {
+        reply.raw.statusCode = 500;
+        reply.raw.setHeader('content-type', 'text/plain; charset=utf-8');
+        reply.raw.end('Internal Server Error');
+      } else if (!reply.raw.writableEnded) {
+        reply.raw.end();
+      }
+    }
   });
 }
