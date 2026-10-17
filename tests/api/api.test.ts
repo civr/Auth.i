@@ -127,6 +127,15 @@ describe('applications API', () => {
     expect((await call('POST', '/applications', { ...demo, redirectUris: ['javascript:alert(1)'] })).statusCode).toBe(400);
     expect((await call('POST', '/applications', { ...demo, slug: 'Bad Slug' })).statusCode).toBe(400);
     expect((await call('POST', '/applications', { ...demo, launchUrl: 'javascript:alert(1)' })).statusCode).toBe(400);
+    for (const bad of [
+      { redirectUris: ['https://demo.example.com/cb x'] },
+      { redirectUris: ['https://demo.example.com/cb\n'] },
+      { postLogoutRedirectUris: ['https://demo.example.com/out\u0001'] },
+    ]) {
+      const r = await call('POST', '/applications', { ...demo, ...bad });
+      expect(r.statusCode).toBe(400);
+      expect(r.headers['content-type']).toContain('application/problem+json');
+    }
     const nonSlug = await call('POST', '/applications', { ...demo, slug: 'a' });
     expect(nonSlug.statusCode).toBe(400);
     expect(nonSlug.headers['content-type']).toContain('application/problem+json');
