@@ -13,7 +13,7 @@ let groups: GroupService;
 beforeEach(async () => {
   t = await createTestDb();
   groups = new GroupService(t.db, new EventBus());
-  apps = new ApplicationService(t.db, createSecretBox(Buffer.alloc(32, 9)), groups);
+  apps = new ApplicationService(t.db, createSecretBox(Buffer.alloc(32, 9), 'client-secrets'), groups);
 });
 afterEach(() => t.destroy());
 

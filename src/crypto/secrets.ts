@@ -9,8 +9,8 @@ export function deriveKey(master: Buffer, purpose: string): Buffer {
   return Buffer.from(hkdfSync('sha256', master, Buffer.alloc(0), `keystone:${purpose}`, 32));
 }
 
-export function createSecretBox(master: Buffer): SecretBox {
-  const key = deriveKey(master, 'secret-box');
+export function createSecretBox(master: Buffer, purpose: string): SecretBox {
+  const key = deriveKey(master, purpose);
   return {
     encrypt(plain) {
       const iv = randomBytes(12);
@@ -25,8 +25,10 @@ export function createSecretBox(master: Buffer): SecretBox {
       if (version !== 'v1' || iv === undefined || ciphertext === undefined || tag === undefined || rest.length) {
         throw new Error('Malformed secret box');
       }
-      const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'));
-      decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+      const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'), { authTagLength: 16 });
+      const tagBytes = Buffer.from(tag, 'base64url');
+      if (tagBytes.length !== 16) throw new Error('Malformed secret box');
+      decipher.setAuthTag(tagBytes);
       return Buffer.concat([decipher.update(Buffer.from(ciphertext, 'base64url')), decipher.final()]).toString('utf8');
     },
   };

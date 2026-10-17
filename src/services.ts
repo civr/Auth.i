@@ -37,7 +37,8 @@ export function createServices(
   db: Db,
   opts: { onEventError?: (err: unknown, event: DomainEvent) => void; logger?: ServiceLogger } = {},
 ): Services {
-  const box = createSecretBox(config.secretKey);
+  const box = createSecretBox(config.secretKey, 'client-secrets');
+  const keyBox = createSecretBox(config.secretKey, 'signing-keys');
   // Failing event handlers must never vanish silently: log them unless the caller handles them.
   const onEventError =
     opts.onEventError ??
@@ -56,6 +57,6 @@ export function createServices(
   const localAuth = new LocalAuthenticator(users, limiter, audit);
   const apps = new ApplicationService(db, box, groups);
   const apiTokens = new ApiTokenService(db);
-  const keys = new SigningKeyService(db, box);
+  const keys = new SigningKeyService(db, keyBox);
   return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys };
 }

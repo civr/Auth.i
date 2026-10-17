@@ -5,7 +5,7 @@ import { createSecretBox, deriveKey, hashToken, randomToken } from '../src/crypt
 const master = Buffer.alloc(32, 3);
 
 describe('SecretBox', () => {
-  const box = createSecretBox(master);
+  const box = createSecretBox(master, 'a');
 
   it('round-trips text, including empty strings and unicode', () => {
     for (const plain of ['hunter2', '', 'zoë 🔐']) {
@@ -25,8 +25,19 @@ describe('SecretBox', () => {
   });
 
   it('rejects ciphertext from another key', () => {
-    const other = createSecretBox(Buffer.alloc(32, 4));
+    const other = createSecretBox(Buffer.alloc(32, 4), 'a');
     expect(() => other.decrypt(box.encrypt('secret'))).toThrow();
+  });
+
+  it('rejects ciphertext from another purpose', () => {
+    const other = createSecretBox(master, 'b');
+    expect(() => other.decrypt(box.encrypt('secret'))).toThrow();
+  });
+
+  it('rejects a truncated auth tag', () => {
+    const parts = box.encrypt('secret').split('.');
+    parts[3] = parts[3]!.slice(0, 8);
+    expect(() => box.decrypt(parts.join('.'))).toThrow(/Malformed/);
   });
 
   it('rejects malformed input', () => {
