@@ -9,6 +9,7 @@ import { ZodError } from 'zod';
 import { registerApi } from '../api/plugin.js';
 import { AppError } from '../errors.js';
 import type { Services } from '../services.js';
+import { registerForwardAuthRoutes } from '../forward-auth/routes.js';
 import { registerInteractionRoutes } from './interaction-routes.js';
 import { registerLoginRoutes } from './login-routes.js';
 import { renderPage } from './views.js';
@@ -106,6 +107,7 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
 
   registerLoginRoutes(app, s);
   registerInteractionRoutes(app, s);
+  registerForwardAuthRoutes(app, s);
   await registerApi(app, s);
   return app;
 }
