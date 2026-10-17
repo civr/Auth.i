@@ -6,13 +6,13 @@ import { loadConfig } from '../src/config.js';
 
 const key = Buffer.alloc(32, 7).toString('base64');
 const base = {
-  AUTHI_ISSUER_URL: 'https://auth.example.com/',
-  AUTHI_SECRET_KEY: key,
-  DATABASE_URL: 'postgres://authi:authi@db/authi',
+  KEYSTONE_ISSUER_URL: 'https://auth.example.com/',
+  KEYSTONE_SECRET_KEY: key,
+  DATABASE_URL: 'postgres://keystone:keystone@db/keystone',
 };
 const withoutSecret = {
-  AUTHI_ISSUER_URL: 'https://auth.example.com/',
-  DATABASE_URL: 'postgres://authi:authi@db/authi',
+  KEYSTONE_ISSUER_URL: 'https://auth.example.com/',
+  DATABASE_URL: 'postgres://keystone:keystone@db/keystone',
 };
 
 describe('loadConfig', () => {
@@ -28,17 +28,17 @@ describe('loadConfig', () => {
   });
 
   it('treats empty strings as unset', () => {
-    const c = loadConfig({ ...base, AUTHI_COOKIE_DOMAIN: '', AUTHI_BOOTSTRAP_ADMIN_USER: '' });
+    const c = loadConfig({ ...base, KEYSTONE_COOKIE_DOMAIN: '', KEYSTONE_BOOTSTRAP_ADMIN_USER: '' });
     expect(c.cookieDomain).toBeUndefined();
     expect(c.bootstrapAdmin).toBeUndefined();
   });
 
   it('rejects a secret key that is not 32 bytes', () => {
-    expect(() => loadConfig({ ...base, AUTHI_SECRET_KEY: 'c2hvcnQ=' })).toThrow(/AUTHI_SECRET_KEY/);
+    expect(() => loadConfig({ ...base, KEYSTONE_SECRET_KEY: 'c2hvcnQ=' })).toThrow(/KEYSTONE_SECRET_KEY/);
   });
 
   it('generates and reuses a persistent secret key when none is provided', () => {
-    const dataDir = mkdtempSync(path.join(tmpdir(), 'authi-config-'));
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'keystone-config-'));
     try {
       const first = loadConfig(withoutSecret, { dataDir });
       const second = loadConfig(withoutSecret, { dataDir });
@@ -50,12 +50,12 @@ describe('loadConfig', () => {
   });
 
   it('uses local defaults with only the persisted database password', () => {
-    const dataDir = mkdtempSync(path.join(tmpdir(), 'authi-defaults-'));
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'keystone-defaults-'));
     try {
       writeFileSync(path.join(dataDir, 'postgres-password'), 'local-password\n');
       const c = loadConfig({}, { dataDir });
       expect(c.issuerUrl).toBe('http://localhost:9000');
-      expect(c.databaseUrl).toBe('postgres://authi:local-password@postgres:5432/authi');
+      expect(c.databaseUrl).toBe('postgres://keystone:local-password@postgres:5432/keystone');
       expect(c.secretKey).toHaveLength(32);
     } finally {
       rmSync(dataDir, { recursive: true, force: true });
@@ -63,17 +63,17 @@ describe('loadConfig', () => {
   });
 
   it('requires a bootstrap password when a bootstrap user is set', () => {
-    expect(() => loadConfig({ ...base, AUTHI_BOOTSTRAP_ADMIN_USER: 'admin' })).toThrow(
-      /AUTHI_BOOTSTRAP_ADMIN_PASSWORD/,
+    expect(() => loadConfig({ ...base, KEYSTONE_BOOTSTRAP_ADMIN_USER: 'admin' })).toThrow(
+      /KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD/,
     );
   });
 
   it('builds the bootstrap admin', () => {
     const c = loadConfig({
       ...base,
-      AUTHI_BOOTSTRAP_ADMIN_USER: 'admin',
-      AUTHI_BOOTSTRAP_ADMIN_PASSWORD: 'correct-horse-battery',
-      AUTHI_BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com',
+      KEYSTONE_BOOTSTRAP_ADMIN_USER: 'admin',
+      KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD: 'correct-horse-battery',
+      KEYSTONE_BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com',
     });
     expect(c.bootstrapAdmin).toEqual({
       username: 'admin',
@@ -83,10 +83,10 @@ describe('loadConfig', () => {
   });
 
   it('uses insecure cookies for an http issuer', () => {
-    expect(loadConfig({ ...base, AUTHI_ISSUER_URL: 'http://localhost:9000' }).secureCookies).toBe(false);
+    expect(loadConfig({ ...base, KEYSTONE_ISSUER_URL: 'http://localhost:9000' }).secureCookies).toBe(false);
   });
 
   it('rejects non-http issuer URLs', () => {
-    expect(() => loadConfig({ ...base, AUTHI_ISSUER_URL: 'ftp://auth.example.com' })).toThrow(/AUTHI_ISSUER_URL/);
+    expect(() => loadConfig({ ...base, KEYSTONE_ISSUER_URL: 'ftp://auth.example.com' })).toThrow(/KEYSTONE_ISSUER_URL/);
   });
 });

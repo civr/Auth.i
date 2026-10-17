@@ -5,25 +5,25 @@ import { z } from 'zod';
 
 const envSchema = z
   .object({
-    AUTHI_ISSUER_URL: z.url({ protocol: /^https?$/ }).default('http://localhost:9000'),
-    AUTHI_COOKIE_DOMAIN: z.string().min(1).optional(),
-    AUTHI_SECRET_KEY: z.string().optional().refine((v) => v === undefined || Buffer.from(v, 'base64').length === 32, {
+    KEYSTONE_ISSUER_URL: z.url({ protocol: /^https?$/ }).default('http://localhost:9000'),
+    KEYSTONE_COOKIE_DOMAIN: z.string().min(1).optional(),
+    KEYSTONE_SECRET_KEY: z.string().optional().refine((v) => v === undefined || Buffer.from(v, 'base64').length === 32, {
       message: 'must be 32 random bytes, base64-encoded (openssl rand -base64 32)',
     }),
     DATABASE_URL: z.string().min(1).optional(),
-    AUTHI_BOOTSTRAP_ADMIN_USER: z.string().min(1).optional(),
-    AUTHI_BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).optional(),
-    AUTHI_BOOTSTRAP_ADMIN_EMAIL: z.email().optional(),
-    AUTHI_TRUST_PROXY: z.string().default('loopback,linklocal,uniquelocal'),
+    KEYSTONE_BOOTSTRAP_ADMIN_USER: z.string().min(1).optional(),
+    KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).optional(),
+    KEYSTONE_BOOTSTRAP_ADMIN_EMAIL: z.email().optional(),
+    KEYSTONE_TRUST_PROXY: z.string().default('loopback,linklocal,uniquelocal'),
     PORT: z.coerce.number().int().positive().default(9000),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   })
   .superRefine((env, ctx) => {
-    if (env.AUTHI_BOOTSTRAP_ADMIN_USER && !env.AUTHI_BOOTSTRAP_ADMIN_PASSWORD) {
+    if (env.KEYSTONE_BOOTSTRAP_ADMIN_USER && !env.KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD) {
       ctx.addIssue({
         code: 'custom',
-        path: ['AUTHI_BOOTSTRAP_ADMIN_PASSWORD'],
-        message: 'required when AUTHI_BOOTSTRAP_ADMIN_USER is set',
+        path: ['KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD'],
+        message: 'required when KEYSTONE_BOOTSTRAP_ADMIN_USER is set',
       });
     }
   });
@@ -46,7 +46,7 @@ function loadOrCreateSecretKey(dataDir: string): Buffer {
 
   try {
     const key = readFileSync(keyPath);
-    if (key.length !== 32) throw new Error(`Invalid persisted Auth.i secret key at ${keyPath}; expected 32 bytes.`);
+    if (key.length !== 32) throw new Error(`Invalid persisted Keystone secret key at ${keyPath}; expected 32 bytes.`);
     return key;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
@@ -59,7 +59,7 @@ function loadOrCreateSecretKey(dataDir: string): Buffer {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
       const existingKey = readFileSync(keyPath);
-      if (existingKey.length !== 32) throw new Error(`Invalid persisted Auth.i secret key at ${keyPath}; expected 32 bytes.`);
+      if (existingKey.length !== 32) throw new Error(`Invalid persisted Keystone secret key at ${keyPath}; expected 32 bytes.`);
       return existingKey;
     }
     throw error;
@@ -83,10 +83,10 @@ export function loadConfig(
     throw new Error(`Invalid configuration:\n${z.prettifyError(parsed.error)}`);
   }
   const e = parsed.data;
-  const issuerUrl = e.AUTHI_ISSUER_URL.replace(/\/+$/, '');
-  const dataDir = options.dataDir ?? (process.env.NODE_ENV === 'production' ? '/app/data' : path.resolve('.authi'));
-  const secretKey = e.AUTHI_SECRET_KEY
-    ? Buffer.from(e.AUTHI_SECRET_KEY, 'base64')
+  const issuerUrl = e.KEYSTONE_ISSUER_URL.replace(/\/+$/, '');
+  const dataDir = options.dataDir ?? (process.env.NODE_ENV === 'production' ? '/app/data' : path.resolve('.keystone'));
+  const secretKey = e.KEYSTONE_SECRET_KEY
+    ? Buffer.from(e.KEYSTONE_SECRET_KEY, 'base64')
     : loadOrCreateSecretKey(dataDir);
   let databaseUrl = e.DATABASE_URL;
   if (!databaseUrl) {
@@ -100,27 +100,27 @@ export function loadConfig(
       }
     }
     if (password) {
-      databaseUrl = `postgres://authi:${encodeURIComponent(password)}@postgres:5432/authi`;
+      databaseUrl = `postgres://keystone:${encodeURIComponent(password)}@postgres:5432/keystone`;
     } else if (process.env.NODE_ENV === 'production') {
       throw new Error(`Postgres password file is missing: ${passwordPath}`);
     } else {
-      databaseUrl = 'postgres://authi:authi@localhost:5432/authi';
+      databaseUrl = 'postgres://keystone:keystone@localhost:5432/keystone';
     }
   }
   return {
     issuerUrl,
-    cookieDomain: e.AUTHI_COOKIE_DOMAIN,
+    cookieDomain: e.KEYSTONE_COOKIE_DOMAIN,
     secureCookies: issuerUrl.startsWith('https://'),
     secretKey,
     databaseUrl,
-    bootstrapAdmin: e.AUTHI_BOOTSTRAP_ADMIN_USER
+    bootstrapAdmin: e.KEYSTONE_BOOTSTRAP_ADMIN_USER
       ? {
-          username: e.AUTHI_BOOTSTRAP_ADMIN_USER,
-          password: e.AUTHI_BOOTSTRAP_ADMIN_PASSWORD!,
-          ...(e.AUTHI_BOOTSTRAP_ADMIN_EMAIL ? { email: e.AUTHI_BOOTSTRAP_ADMIN_EMAIL } : {}),
+          username: e.KEYSTONE_BOOTSTRAP_ADMIN_USER,
+          password: e.KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD!,
+          ...(e.KEYSTONE_BOOTSTRAP_ADMIN_EMAIL ? { email: e.KEYSTONE_BOOTSTRAP_ADMIN_EMAIL } : {}),
         }
       : undefined,
-    trustProxy: e.AUTHI_TRUST_PROXY,
+    trustProxy: e.KEYSTONE_TRUST_PROXY,
     port: e.PORT,
     logLevel: e.LOG_LEVEL,
   };

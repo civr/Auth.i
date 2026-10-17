@@ -217,7 +217,7 @@ function connectStepTwo({ name, url, method, redirect }) {
       </dl>
       <p class="callout">The client secret is shown once. Store it in ${esc(name)} now.</p>`;
   } else {
-    const snippet = `${host} {\n  forward_auth keystone:9000 {\n    uri /outpost/auth\n    copy_headers X-Authi-User X-Authi-Email X-Authi-Name X-Authi-Groups\n  }\n  reverse_proxy ${slug}:80\n}`;
+    const snippet = `${host} {\n  forward_auth keystone:9000 {\n    uri /outpost/auth\n    copy_headers X-Keystone-User X-Keystone-Email X-Keystone-Name X-Keystone-Groups\n  }\n  reverse_proxy ${slug}:80\n}`;
     body = `<p class="modal-intro">Add this to your Caddyfile. Caddy asks Keystone before every request to ${esc(host)}.</p>
       <div class="setting"><div class="snippet-head"><span class="field-label">Caddyfile</span><button class="copy-button" type="button" data-copy="${esc(snippet)}">Copy</button></div><pre class="snippet">${esc(snippet)}</pre></div>
       <p class="field-hint">Using Traefik or nginx? Point their auth check at <code>${esc(baseUrl)}/outpost/auth</code>.</p>`;

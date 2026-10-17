@@ -1,6 +1,6 @@
-# Auth.i
+# Keystone
 
-Auth.i's first Docker deployment foundation runs two isolated roles: the Node.js HTTP service and
+Keystone's first Docker deployment foundation runs two isolated roles: the Node.js HTTP service and
 Postgres 17. Postgres is reachable only on the private Compose network and stores its data in a
 named volume. The HTTP port binds to loopback so an existing TLS reverse proxy can reach it without
 publishing it directly to the internet.
@@ -20,13 +20,13 @@ docker compose ps
 curl http://127.0.0.1:9000/healthz
 ```
 
-On first start, Compose creates a random Postgres password and Auth.i creates a random encryption
+On first start, Compose creates a random Postgres password and Keystone creates a random encryption
 key. Both are kept in the persistent `authi-data` volume. The local issuer URL defaults to
 `http://localhost:9000`. The health endpoint returns `{"status":"ok"}` while Postgres is reachable.
 The app waits for Postgres's health check before starting. To inspect logs or stop the deployment:
 
 ```sh
-docker compose logs -f authi
+docker compose logs -f keystone
 docker compose down
 ```
 
@@ -53,10 +53,10 @@ The preview server binds only to loopback.
 
 ## Service roles
 
-- `authi`: non-root Node.js 24 service; HTTP port 9000 is published only on `127.0.0.1` for the
+- `keystone`: non-root Node.js 24 service; HTTP port 9000 is published only on `127.0.0.1` for the
   host's TLS reverse proxy.
 - `postgres`: Postgres 17; no host port is published, and persistent files live in `postgres-data`.
 
-Both services use a dedicated private bridge network. Change `AUTHI_HOST_PORT` if port 9000 is
+Both services use a dedicated private bridge network. Change `KEYSTONE_HOST_PORT` if port 9000 is
 already occupied. Do not expose the service directly to the internet; terminate TLS at the existing
 reverse proxy.

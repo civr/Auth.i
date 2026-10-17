@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = fileURLToPath(new URL('../demo/', import.meta.url));
-const port = Number(process.env.AUTHI_MOCK_PORT ?? 4173);
+const port = Number(process.env.KEYSTONE_MOCK_PORT ?? 4173);
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
@@ -19,7 +19,7 @@ const headers = {
 };
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error('AUTHI_MOCK_PORT must be a port from 1 to 65535.');
+  throw new Error('KEYSTONE_MOCK_PORT must be a port from 1 to 65535.');
 }
 
 const server = createServer(async (request, response) => {

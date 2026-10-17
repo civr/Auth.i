@@ -1,14 +1,14 @@
-# Auth.i Core (Plan 1 of 4) Implementation Plan
+# Keystone Core (Plan 1 of 4) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Dockerized Auth.i that gives apps SSO with local users via OIDC and forward-auth, managed through a REST API and CLI.
+**Goal:** A Dockerized Keystone that gives apps SSO with local users via OIDC and forward-auth, managed through a REST API and CLI.
 
-**Architecture:** One Fastify (Node 24, TypeScript ESM) process backed by Postgres. `oidc-provider` is mounted at `/oidc` through `@fastify/middie`; Auth.i's own session cookie (`authi_session`) is the master login session and is enforced inside the OIDC login prompt and the forward-auth endpoint. Business logic lives in small services (`src/<module>/`), HTTP routes only call services.
+**Architecture:** One Fastify (Node 24, TypeScript ESM) process backed by Postgres. `oidc-provider` is mounted at `/oidc` through `@fastify/middie`; Keystone's own session cookie (`keystone_session`) is the master login session and is enforced inside the OIDC login prompt and the forward-auth endpoint. Business logic lives in small services (`src/<module>/`), HTTP routes only call services.
 
 **Tech Stack:** Node.js 24, TypeScript 5.9 (NodeNext ESM), Fastify 5, oidc-provider 9, Kysely + pg, Postgres 17, argon2, zod 4, Eta 4, vitest, openid-client 6 (tests only), Docker Compose.
 
-**Spec:** `docs/superpowers/specs/2026-10-04-authi-design.md`
+**Spec:** `docs/superpowers/specs/2026-10-04-keystone-design.md`
 
 **Plan series:** This is plan 1 of 4. Plan 2 = upstream sources (LDAPS/AD, SAML/Entra, OIDC/Entra, AD sync). Plan 3 = SCIM provisioning. Plan 4 = admin UI, user dashboard polish, `/me`, TOTP, app snippets, OpenAPI, cookie+CSRF auth for the API, optional per-app consent screen, client_credentials grant, docs. Everything the spec lists for those areas is out of scope here.
 
@@ -16,11 +16,11 @@
 
 - Runtime Node.js >= 24; Docker base image `node:24-alpine`. ESM only; relative imports end in `.js`.
 - Database Postgres 17. No Redis. All state (sessions, OIDC artifacts, rate limits) in Postgres.
-- Env vars exactly: `AUTHI_ISSUER_URL`, `AUTHI_COOKIE_DOMAIN`, `AUTHI_SECRET_KEY` (32 bytes base64), `DATABASE_URL`, `AUTHI_BOOTSTRAP_ADMIN_USER`, `AUTHI_BOOTSTRAP_ADMIN_PASSWORD`, `AUTHI_BOOTSTRAP_ADMIN_EMAIL`, `AUTHI_TRUST_PROXY`, `PORT` (default 9000), `LOG_LEVEL`.
-- OIDC issuer = `AUTHI_ISSUER_URL` + `/oidc`. Scopes: `openid`, `offline_access`, `profile`, `email`, `groups`. Claims: `sub`, `name`, `given_name`, `family_name`, `preferred_username`, `email`, `email_verified`, `groups` (array of group names). Flow: authorization code (PKCE required for public clients, allowed for all), refresh token. No implicit.
-- Session cookie `authi_session`: HttpOnly, SameSite=Lax, Secure when issuer is https, Domain = `AUTHI_COOKIE_DOMAIN` when set, absolute lifetime 12h.
-- Forward-auth endpoint `GET /outpost/auth`; response headers `X-Authi-User`, `X-Authi-Email`, `X-Authi-Name`, `X-Authi-Groups`, `X-Authi-Uid`. `X-Authi-Name` and each group name in `X-Authi-Groups` are `encodeURIComponent`-encoded (groups joined with `,`).
-- Secrets at rest: AES-256-GCM with HKDF-derived per-purpose keys from `AUTHI_SECRET_KEY`. Passwords argon2id. API tokens and session tokens stored only as SHA-256 hex.
+- Env vars exactly: `KEYSTONE_ISSUER_URL`, `KEYSTONE_COOKIE_DOMAIN`, `KEYSTONE_SECRET_KEY` (32 bytes base64), `DATABASE_URL`, `KEYSTONE_BOOTSTRAP_ADMIN_USER`, `KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD`, `KEYSTONE_BOOTSTRAP_ADMIN_EMAIL`, `KEYSTONE_TRUST_PROXY`, `PORT` (default 9000), `LOG_LEVEL`.
+- OIDC issuer = `KEYSTONE_ISSUER_URL` + `/oidc`. Scopes: `openid`, `offline_access`, `profile`, `email`, `groups`. Claims: `sub`, `name`, `given_name`, `family_name`, `preferred_username`, `email`, `email_verified`, `groups` (array of group names). Flow: authorization code (PKCE required for public clients, allowed for all), refresh token. No implicit.
+- Session cookie `keystone_session`: HttpOnly, SameSite=Lax, Secure when issuer is https, Domain = `KEYSTONE_COOKIE_DOMAIN` when set, absolute lifetime 12h.
+- Forward-auth endpoint `GET /outpost/auth`; response headers `X-Keystone-User`, `X-Keystone-Email`, `X-Keystone-Name`, `X-Keystone-Groups`, `X-Keystone-Uid`. `X-Keystone-Name` and each group name in `X-Keystone-Groups` are `encodeURIComponent`-encoded (groups joined with `,`).
+- Secrets at rest: AES-256-GCM with HKDF-derived per-purpose keys from `KEYSTONE_SECRET_KEY`. Passwords argon2id. API tokens and session tokens stored only as SHA-256 hex.
 - Admin REST API under `/api/v1`, Bearer API tokens only (cookie auth comes in plan 4), errors as `application/problem+json` (RFC 7807).
 - Passwords: minimum 12 characters. Usernames: `^[a-zA-Z0-9._@-]{2,64}$`. App slugs (= OIDC `client_id`): `^[a-z0-9][a-z0-9-]{1,62}$`.
 - Deactivation never deletes data. Deleting a group removes it from every application's `allowed_group_ids`.
@@ -119,7 +119,7 @@ Docker must be running. Tests need the test database: after Task 3 creates `dock
 
 ```bash
 npm init -y
-npm pkg set name=authi version=0.1.0 private=true type=module engines.node=">=24"
+npm pkg set name=keystone version=0.1.0 private=true type=module engines.node=">=24"
 npm pkg set scripts.dev="tsx watch src/server.ts" scripts.build="tsc -p tsconfig.build.json" scripts.start="node dist/server.js" scripts.cli="tsx src/cli.ts" scripts.test="vitest run" scripts.typecheck="tsc --noEmit" scripts.db:test:up="docker compose -f docker-compose.test.yml up -d --wait" scripts.db:test:down="docker compose -f docker-compose.test.yml down"
 npm pkg delete main scripts.test-placeholder keywords author license description
 npm i fastify @fastify/cookie @fastify/formbody @fastify/middie oidc-provider kysely pg argon2 zod eta
@@ -183,9 +183,9 @@ import { loadConfig } from '../src/config.js';
 
 const key = Buffer.alloc(32, 7).toString('base64');
 const base = {
-  AUTHI_ISSUER_URL: 'https://auth.example.com/',
-  AUTHI_SECRET_KEY: key,
-  DATABASE_URL: 'postgres://authi:authi@db/authi',
+  KEYSTONE_ISSUER_URL: 'https://auth.example.com/',
+  KEYSTONE_SECRET_KEY: key,
+  DATABASE_URL: 'postgres://keystone:keystone@db/keystone',
 };
 
 describe('loadConfig', () => {
@@ -201,27 +201,27 @@ describe('loadConfig', () => {
   });
 
   it('treats empty strings as unset', () => {
-    const c = loadConfig({ ...base, AUTHI_COOKIE_DOMAIN: '', AUTHI_BOOTSTRAP_ADMIN_USER: '' });
+    const c = loadConfig({ ...base, KEYSTONE_COOKIE_DOMAIN: '', KEYSTONE_BOOTSTRAP_ADMIN_USER: '' });
     expect(c.cookieDomain).toBeUndefined();
     expect(c.bootstrapAdmin).toBeUndefined();
   });
 
   it('rejects a secret key that is not 32 bytes', () => {
-    expect(() => loadConfig({ ...base, AUTHI_SECRET_KEY: 'c2hvcnQ=' })).toThrow(/AUTHI_SECRET_KEY/);
+    expect(() => loadConfig({ ...base, KEYSTONE_SECRET_KEY: 'c2hvcnQ=' })).toThrow(/KEYSTONE_SECRET_KEY/);
   });
 
   it('requires a bootstrap password when a bootstrap user is set', () => {
-    expect(() => loadConfig({ ...base, AUTHI_BOOTSTRAP_ADMIN_USER: 'admin' })).toThrow(
-      /AUTHI_BOOTSTRAP_ADMIN_PASSWORD/,
+    expect(() => loadConfig({ ...base, KEYSTONE_BOOTSTRAP_ADMIN_USER: 'admin' })).toThrow(
+      /KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD/,
     );
   });
 
   it('builds the bootstrap admin', () => {
     const c = loadConfig({
       ...base,
-      AUTHI_BOOTSTRAP_ADMIN_USER: 'admin',
-      AUTHI_BOOTSTRAP_ADMIN_PASSWORD: 'correct-horse-battery',
-      AUTHI_BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com',
+      KEYSTONE_BOOTSTRAP_ADMIN_USER: 'admin',
+      KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD: 'correct-horse-battery',
+      KEYSTONE_BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com',
     });
     expect(c.bootstrapAdmin).toEqual({
       username: 'admin',
@@ -231,11 +231,11 @@ describe('loadConfig', () => {
   });
 
   it('uses insecure cookies for an http issuer', () => {
-    expect(loadConfig({ ...base, AUTHI_ISSUER_URL: 'http://localhost:9000' }).secureCookies).toBe(false);
+    expect(loadConfig({ ...base, KEYSTONE_ISSUER_URL: 'http://localhost:9000' }).secureCookies).toBe(false);
   });
 
   it('rejects non-http issuer URLs', () => {
-    expect(() => loadConfig({ ...base, AUTHI_ISSUER_URL: 'ftp://auth.example.com' })).toThrow(/AUTHI_ISSUER_URL/);
+    expect(() => loadConfig({ ...base, KEYSTONE_ISSUER_URL: 'ftp://auth.example.com' })).toThrow(/KEYSTONE_ISSUER_URL/);
   });
 });
 ```
@@ -252,25 +252,25 @@ import { z } from 'zod';
 
 const envSchema = z
   .object({
-    AUTHI_ISSUER_URL: z.url({ protocol: /^https?$/ }),
-    AUTHI_COOKIE_DOMAIN: z.string().min(1).optional(),
-    AUTHI_SECRET_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
+    KEYSTONE_ISSUER_URL: z.url({ protocol: /^https?$/ }),
+    KEYSTONE_COOKIE_DOMAIN: z.string().min(1).optional(),
+    KEYSTONE_SECRET_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
       message: 'must be 32 random bytes, base64-encoded (openssl rand -base64 32)',
     }),
     DATABASE_URL: z.string().min(1),
-    AUTHI_BOOTSTRAP_ADMIN_USER: z.string().min(1).optional(),
-    AUTHI_BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).optional(),
-    AUTHI_BOOTSTRAP_ADMIN_EMAIL: z.email().optional(),
-    AUTHI_TRUST_PROXY: z.string().default('loopback,linklocal,uniquelocal'),
+    KEYSTONE_BOOTSTRAP_ADMIN_USER: z.string().min(1).optional(),
+    KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).optional(),
+    KEYSTONE_BOOTSTRAP_ADMIN_EMAIL: z.email().optional(),
+    KEYSTONE_TRUST_PROXY: z.string().default('loopback,linklocal,uniquelocal'),
     PORT: z.coerce.number().int().positive().default(9000),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   })
   .superRefine((env, ctx) => {
-    if (env.AUTHI_BOOTSTRAP_ADMIN_USER && !env.AUTHI_BOOTSTRAP_ADMIN_PASSWORD) {
+    if (env.KEYSTONE_BOOTSTRAP_ADMIN_USER && !env.KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD) {
       ctx.addIssue({
         code: 'custom',
-        path: ['AUTHI_BOOTSTRAP_ADMIN_PASSWORD'],
-        message: 'required when AUTHI_BOOTSTRAP_ADMIN_USER is set',
+        path: ['KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD'],
+        message: 'required when KEYSTONE_BOOTSTRAP_ADMIN_USER is set',
       });
     }
   });
@@ -294,21 +294,21 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error(`Invalid configuration:\n${z.prettifyError(parsed.error)}`);
   }
   const e = parsed.data;
-  const issuerUrl = e.AUTHI_ISSUER_URL.replace(/\/+$/, '');
+  const issuerUrl = e.KEYSTONE_ISSUER_URL.replace(/\/+$/, '');
   return {
     issuerUrl,
-    cookieDomain: e.AUTHI_COOKIE_DOMAIN,
+    cookieDomain: e.KEYSTONE_COOKIE_DOMAIN,
     secureCookies: issuerUrl.startsWith('https://'),
-    secretKey: Buffer.from(e.AUTHI_SECRET_KEY, 'base64'),
+    secretKey: Buffer.from(e.KEYSTONE_SECRET_KEY, 'base64'),
     databaseUrl: e.DATABASE_URL,
-    bootstrapAdmin: e.AUTHI_BOOTSTRAP_ADMIN_USER
+    bootstrapAdmin: e.KEYSTONE_BOOTSTRAP_ADMIN_USER
       ? {
-          username: e.AUTHI_BOOTSTRAP_ADMIN_USER,
-          password: e.AUTHI_BOOTSTRAP_ADMIN_PASSWORD!,
-          ...(e.AUTHI_BOOTSTRAP_ADMIN_EMAIL ? { email: e.AUTHI_BOOTSTRAP_ADMIN_EMAIL } : {}),
+          username: e.KEYSTONE_BOOTSTRAP_ADMIN_USER,
+          password: e.KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD!,
+          ...(e.KEYSTONE_BOOTSTRAP_ADMIN_EMAIL ? { email: e.KEYSTONE_BOOTSTRAP_ADMIN_EMAIL } : {}),
         }
       : undefined,
-    trustProxy: e.AUTHI_TRUST_PROXY,
+    trustProxy: e.KEYSTONE_TRUST_PROXY,
     port: e.PORT,
     logLevel: e.LOG_LEVEL,
   };
@@ -445,7 +445,7 @@ export interface SecretBox {
 }
 
 export function deriveKey(master: Buffer, purpose: string): Buffer {
-  return Buffer.from(hkdfSync('sha256', master, Buffer.alloc(0), `authi:${purpose}`, 32));
+  return Buffer.from(hkdfSync('sha256', master, Buffer.alloc(0), `keystone:${purpose}`, 32));
 }
 
 export function createSecretBox(master: Buffer): SecretBox {
@@ -496,7 +496,7 @@ export function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(hash: string | null, password: string): Promise<boolean> {
   if (hash === null) {
     // Spend the same work as a real check so unknown usernames are not distinguishable by timing.
-    dummyHash ??= argon2.hash('authi-dummy-password', OPTIONS);
+    dummyHash ??= argon2.hash('keystone-dummy-password', OPTIONS);
     await argon2.verify(await dummyHash, password);
     return false;
   }
@@ -550,15 +550,15 @@ services:
   postgres-test:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: authi
-      POSTGRES_PASSWORD: authi
+      POSTGRES_USER: keystone
+      POSTGRES_PASSWORD: keystone
       POSTGRES_DB: postgres
     ports:
       - "55432:5432"
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U authi"]
+      test: ["CMD-SHELL", "pg_isready -U keystone"]
       interval: 2s
       timeout: 3s
       retries: 20
@@ -908,7 +908,7 @@ import type { Db } from './db.js';
 
 // Resolves to <project>/migrations from both src/db (tsx) and dist/db (compiled).
 const MIGRATIONS_DIR = new URL('../../migrations/', import.meta.url);
-const LOCK_ID = 7_424_242; // arbitrary, unique to Auth.i
+const LOCK_ID = 7_424_242; // arbitrary, unique to Keystone
 
 export async function runMigrations(db: Db): Promise<string[]> {
   return db.connection().execute(async (conn) => {
@@ -950,7 +950,7 @@ import pg from 'pg';
 import { createDb, type Db } from '../../src/db/db.js';
 import { runMigrations } from '../../src/db/migrate.js';
 
-const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://authi:authi@localhost:55432/postgres';
+const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://keystone:keystone@localhost:55432/postgres';
 
 export interface TestDb {
   db: Db;
@@ -969,7 +969,7 @@ async function admin(query: string): Promise<void> {
 }
 
 export async function createTestDb(): Promise<TestDb> {
-  const name = `authi_test_${randomBytes(6).toString('hex')}`;
+  const name = `keystone_test_${randomBytes(6).toString('hex')}`;
   await admin(`CREATE DATABASE ${name}`);
   const url = new URL(ADMIN_URL);
   url.pathname = `/${name}`;
@@ -1976,7 +1976,7 @@ git commit -m "feat: add user and group services with domain events"
 - Produces:
   ```ts
   // sessions.ts
-  export const SESSION_COOKIE = 'authi_session';
+  export const SESSION_COOKIE = 'keystone_session';
   export interface Session { id: string; userId: string; expiresAt: Date }
   export class SessionService {
     constructor(db: Db, ttlMs?: number);             // default 12h
@@ -2155,7 +2155,7 @@ import { hashToken, randomToken } from '../crypto/secrets.js';
 import type { Db } from '../db/db.js';
 import { isUuid } from '../util.js';
 
-export const SESSION_COOKIE = 'authi_session';
+export const SESSION_COOKIE = 'keystone_session';
 
 export interface Session {
   id: string;
@@ -2961,7 +2961,7 @@ git commit -m "feat: add application registry with encrypted client secrets"
   // http/views.ts
   export function renderPage(reply: FastifyReply, template: string, data: Record<string, unknown>): FastifyReply;
   // http/csrf.ts
-  export const CSRF_COOKIE = 'authi_csrf';
+  export const CSRF_COOKIE = 'keystone_csrf';
   export function issueCsrfToken(req: FastifyRequest, reply: FastifyReply, config: Config): string;
   export function verifyCsrfToken(req: FastifyRequest, submitted: unknown): boolean;
   // http/context.ts
@@ -3047,7 +3047,7 @@ const cookie = (res: InjectResponse, name: string) =>
 
 async function loginForm(query = '') {
   const res = await ctx.app.inject({ method: 'GET', url: `/login${query}` });
-  return { res, csrf: cookie(res, 'authi_csrf')!.value };
+  return { res, csrf: cookie(res, 'keystone_csrf')!.value };
 }
 
 function postLogin(fields: Record<string, string>, cookies: Record<string, string> = {}) {
@@ -3062,7 +3062,7 @@ function postLogin(fields: Record<string, string>, cookies: Record<string, strin
 
 async function signIn(rd = '/') {
   const { csrf } = await loginForm();
-  return postLogin({ csrf, rd, identifier: 'alice', password: TEST_PASSWORD }, { authi_csrf: csrf });
+  return postLogin({ csrf, rd, identifier: 'alice', password: TEST_PASSWORD }, { keystone_csrf: csrf });
 }
 
 describe('login pages', () => {
@@ -3080,12 +3080,12 @@ describe('login pages', () => {
   it('rejects a POST without a matching CSRF token', async () => {
     const res = await postLogin({ csrf: 'forged', identifier: 'alice', password: TEST_PASSWORD });
     expect(res.statusCode).toBe(403);
-    expect(cookie(res, 'authi_session')).toBeUndefined();
+    expect(cookie(res, 'keystone_session')).toBeUndefined();
   });
 
   it('shows an error for wrong credentials and keeps the identifier', async () => {
     const { csrf } = await loginForm();
-    const res = await postLogin({ csrf, identifier: 'alice', password: 'wrong-password-1' }, { authi_csrf: csrf });
+    const res = await postLogin({ csrf, identifier: 'alice', password: 'wrong-password-1' }, { keystone_csrf: csrf });
     expect(res.statusCode).toBe(401);
     expect(res.body).toContain('Invalid username or password.');
     expect(res.body).toContain('value="alice"');
@@ -3095,9 +3095,9 @@ describe('login pages', () => {
     const res = await signIn();
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe('/');
-    const session = cookie(res, 'authi_session')!;
+    const session = cookie(res, 'keystone_session')!;
     expect(session).toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax', domain: '.example.test', path: '/' });
-    const home = await ctx.app.inject({ method: 'GET', url: '/', cookies: { authi_session: session.value } });
+    const home = await ctx.app.inject({ method: 'GET', url: '/', cookies: { keystone_session: session.value } });
     expect(home.statusCode).toBe(200);
     expect(home.body).toContain('alice');
   });
@@ -3113,20 +3113,20 @@ describe('login pages', () => {
   });
 
   it('redirects an already signed-in user straight to rd', async () => {
-    const token = cookie(await signIn(), 'authi_session')!.value;
-    const res = await ctx.app.inject({ method: 'GET', url: '/login?rd=%2Fnext', cookies: { authi_session: token } });
+    const token = cookie(await signIn(), 'keystone_session')!.value;
+    const res = await ctx.app.inject({ method: 'GET', url: '/login?rd=%2Fnext', cookies: { keystone_session: token } });
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe('/next');
   });
 
   it('signs out and invalidates the session', async () => {
-    const token = cookie(await signIn(), 'authi_session')!.value;
-    const res = await ctx.app.inject({ method: 'POST', url: '/logout', cookies: { authi_session: token } });
+    const token = cookie(await signIn(), 'keystone_session')!.value;
+    const res = await ctx.app.inject({ method: 'POST', url: '/logout', cookies: { keystone_session: token } });
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe('/login?loggedOut=1');
-    expect(cookie(res, 'authi_session')?.value).toBe('');
+    expect(cookie(res, 'keystone_session')?.value).toBe('');
     expect(await ctx.services.sessions.validate(token)).toBeNull();
-    const home = await ctx.app.inject({ method: 'GET', url: '/', cookies: { authi_session: token } });
+    const home = await ctx.app.inject({ method: 'GET', url: '/', cookies: { keystone_session: token } });
     expect(home.headers.location).toBe('/login');
   });
 
@@ -3134,7 +3134,7 @@ describe('login pages', () => {
     const { csrf } = await loginForm();
     let res: InjectResponse | undefined;
     for (let i = 0; i < 11; i++) {
-      res = await postLogin({ csrf, identifier: 'alice', password: 'wrong-password-1' }, { authi_csrf: csrf });
+      res = await postLogin({ csrf, identifier: 'alice', password: 'wrong-password-1' }, { keystone_csrf: csrf });
     }
     expect(res!.statusCode).toBe(429);
     expect(res!.body).toContain('Too many attempts');
@@ -3232,7 +3232,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Config } from '../config.js';
 import { randomToken } from '../crypto/secrets.js';
 
-export const CSRF_COOKIE = 'authi_csrf';
+export const CSRF_COOKIE = 'keystone_csrf';
 
 export function issueCsrfToken(req: FastifyRequest, reply: FastifyReply, config: Config): string {
   const existing = req.cookies[CSRF_COOKIE];
@@ -3293,7 +3293,7 @@ export async function redirectRules(s: Pick<Services, 'config' | 'apps'>): Promi
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><%= it.title %> · Auth.i</title>
+<title><%= it.title %> · Keystone</title>
 <style>
 :root { color-scheme: light dark; --bg:#f6f7f9; --card:#fff; --text:#1d2433; --muted:#5b6475; --accent:#3557d6; --danger:#b42318; --border:#dde1e8; }
 @media (prefers-color-scheme: dark) { :root { --bg:#12151b; --card:#1b1f27; --text:#e7eaf0; --muted:#9aa3b2; --accent:#7d97ff; --danger:#ff8a80; --border:#2c323d; } }
@@ -3318,7 +3318,7 @@ ul.apps a { display:block; padding:10px 0; color:var(--accent); text-decoration:
 `views/login.eta`:
 ```html
 <% layout('layout') %>
-<h1>Sign in to Auth.i</h1>
+<h1>Sign in to Keystone</h1>
 <% if (it.loggedOut) { %><p class="notice">You have been signed out.</p><% } %>
 <% if (it.error) { %><p class="error" role="alert"><%= it.error %></p><% } %>
 <form method="post" action="/login">
@@ -3352,7 +3352,7 @@ ul.apps a { display:block; padding:10px 0; color:var(--accent); text-decoration:
 <% layout('layout') %>
 <h1><%= it.title %></h1>
 <p><%= it.message %></p>
-<p><a href="/">Back to Auth.i</a></p>
+<p><a href="/">Back to Keystone</a></p>
 ```
 
 - [ ] **Step 7: App and login routes**
@@ -3621,7 +3621,7 @@ afterEach(() => t.destroy());
 describe('ApiTokenService', () => {
   it('creates prefixed tokens, stores only the hash and verifies them', async () => {
     const { token, apiToken } = await tokens.create({ name: 'ci' });
-    expect(token).toMatch(/^authi_[A-Za-z0-9_-]{43}$/);
+    expect(token).toMatch(/^keystone_[A-Za-z0-9_-]{43}$/);
     const raw = await t.db.selectFrom('api_tokens').select('token_hash').executeTakeFirstOrThrow();
     expect(raw.token_hash).not.toContain(token);
     const verified = await tokens.verify(token);
@@ -3630,7 +3630,7 @@ describe('ApiTokenService', () => {
   });
 
   it('rejects unknown and expired tokens', async () => {
-    expect(await tokens.verify('authi_nope')).toBeNull();
+    expect(await tokens.verify('keystone_nope')).toBeNull();
     const { token } = await tokens.create({ name: 'old', expiresAt: new Date(Date.now() - 1000) });
     expect(await tokens.verify(token)).toBeNull();
   });
@@ -3673,7 +3673,7 @@ describe('API authentication', () => {
     expect(none.statusCode).toBe(401);
     expect(none.headers['content-type']).toContain('application/problem+json');
     expect(none.json()).toMatchObject({ status: 401, title: 'Unauthorized' });
-    expect((await call('GET', '/users', undefined, 'authi_wrong')).statusCode).toBe(401);
+    expect((await call('GET', '/users', undefined, 'keystone_wrong')).statusCode).toBe(401);
   });
 
   it('rejects expired tokens', async () => {
@@ -3783,7 +3783,7 @@ describe('applications API', () => {
 describe('api tokens and audit API', () => {
   it('creates, lists and revokes tokens', async () => {
     const created = (await call('POST', '/api-tokens', { name: 'ci' })).json();
-    expect(created.token).toMatch(/^authi_/);
+    expect(created.token).toMatch(/^keystone_/);
     expect((await call('GET', '/users', undefined, created.token)).statusCode).toBe(200);
     const list = await call('GET', '/api-tokens');
     expect(list.body).not.toContain(created.token);
@@ -3839,7 +3839,7 @@ export class ApiTokenService {
   constructor(private readonly db: Db) {}
 
   async create(input: { name: string; createdBy?: string | null; expiresAt?: Date | null }): Promise<{ token: string; apiToken: ApiToken }> {
-    const token = `authi_${randomToken(32)}`;
+    const token = `keystone_${randomToken(32)}`;
     const row = await this.db
       .insertInto('api_tokens')
       .values({
@@ -4575,7 +4575,7 @@ git commit -m "feat: add encrypted signing keys and postgres oidc adapter"
 - Routes: `/oidc/*` (oidc-provider: discovery at `/oidc/.well-known/openid-configuration`, `/oidc/auth`, `/oidc/token`, `/oidc/me`, `/oidc/jwks`, `/oidc/session/end`, `/oidc/token/revocation`, `/oidc/token/introspection`), `GET /interaction/:uid`, `POST /api/v1/keys/rotate`.
 
 Behaviour summary (the tests below pin each line):
-- The OIDC `login` prompt also fires when the Auth.i session cookie is missing or belongs to another user, so signing out of Auth.i signs the user out of OIDC as well.
+- The OIDC `login` prompt also fires when the Keystone session cookie is missing or belongs to another user, so signing out of Keystone signs the user out of OIDC as well.
 - `/interaction/:uid` sends users without a session to `/login?rd=/interaction/<uid>`; signed-in users are checked against the app policy and either get `access_denied` or an auto-granted consent (all apps are first-party).
 - `findAccount` returns nothing for inactive users or users who lost access to the requesting client, which makes refresh-token grants fail immediately.
 - Refresh tokens are issued whenever the client allows the `refresh_token` grant (no `offline_access` + `prompt=consent` dance).
@@ -4651,7 +4651,7 @@ export class TestBrowser {
     throw new Error('Too many redirects');
   }
 
-  /** Submits the Auth.i login form shown on `page` and follows the resulting redirects. */
+  /** Submits the Keystone login form shown on `page` and follows the resulting redirects. */
   async signIn(page: Page, identifier: string, password: string, stop: (u: URL) => boolean = () => false): Promise<Page> {
     const html = await page.response!.text();
     const field = (name: string) => decodeHtml(html.match(new RegExp(`name="${name}" value="([^"]*)"`))?.[1] ?? '');
@@ -4783,7 +4783,7 @@ describe('OIDC provider', () => {
     expect(jwks.keys.every((k: { d?: string }) => k.d === undefined)).toBe(true);
   });
 
-  it('signs in through the Auth.i login page and issues tokens with profile, email and groups', async () => {
+  it('signs in through the Keystone login page and issues tokens with profile, email and groups', async () => {
     const config = await discover();
     const tokens = await signInAndExchange(new TestBrowser(), config);
     const claims = tokens.claims()!;
@@ -4802,7 +4802,7 @@ describe('OIDC provider', () => {
     expect(info).toMatchObject({ email: 'alice@example.test', groups: ['staff'] });
   });
 
-  it('reuses the Auth.i session for the next authorization without showing the form', async () => {
+  it('reuses the Keystone session for the next authorization without showing the form', async () => {
     const config = await discover();
     const browser = new TestBrowser();
     await signInAndExchange(browser, config);
@@ -4845,7 +4845,7 @@ describe('OIDC provider', () => {
     expect(page.url.searchParams.get('error')).toBe('login_required');
   });
 
-  it('requires a fresh login after signing out of Auth.i', async () => {
+  it('requires a fresh login after signing out of Keystone', async () => {
     const config = await discover();
     const browser = new TestBrowser();
     await signInAndExchange(browser, config);
@@ -4910,15 +4910,15 @@ export interface OidcDeps {
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function page(title: string, body: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)} · Auth.i</title></head><body style="font:16px/1.5 system-ui,sans-serif;max-width:420px;margin:15vh auto;padding:0 16px">${body}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)} · Keystone</title></head><body style="font:16px/1.5 system-ui,sans-serif;max-width:420px;margin:15vh auto;padding:0 16px">${body}</body></html>`;
 }
 
 export async function createOidcProvider(d: OidcDeps): Promise<Provider> {
   const policy = interactionPolicy.base();
   policy.get('login')!.checks.add(
     new interactionPolicy.Check(
-      'authi_session',
-      'Auth.i session is missing or belongs to another user',
+      'keystone_session',
+      'Keystone session is missing or belongs to another user',
       async (ctx: KoaContextWithOIDC) => {
         const token = ctx.cookies.get(SESSION_COOKIE, { signed: false });
         const session = await d.sessions.validate(token);
@@ -5014,7 +5014,7 @@ export async function createOidcProvider(d: OidcDeps): Promise<Provider> {
 }
 ```
 
-Note: Koa's `ctx.cookies.get` defaults to signed reads once cookie keys are configured, so the explicit `{ signed: false }` is required to read the plain `authi_session` cookie.
+Note: Koa's `ctx.cookies.get` defaults to signed reads once cookie keys are configured, so the explicit `{ signed: false }` is required to read the plain `keystone_session` cookie.
 
 `src/oidc/holder.ts`:
 ```ts
@@ -5170,7 +5170,7 @@ If `ctx.oidc.session` is typed as non-optional in `@types/oidc-provider`, the `?
 
 ```bash
 git add src/oidc src/services.ts src/http src/api tests/helpers tests/oidc/flow.test.ts
-git commit -m "feat: add OIDC provider with Auth.i session-backed login and access policy"
+git commit -m "feat: add OIDC provider with Keystone session-backed login and access policy"
 ```
 
 ---
@@ -5222,7 +5222,7 @@ function check(headers: Record<string, string>, opts: { session?: string; query?
     method: 'GET',
     url: `/outpost/auth${opts.query ?? ''}`,
     headers: { 'x-forwarded-proto': 'https', 'x-forwarded-uri': '/page?x=1', ...headers },
-    cookies: opts.session ? { authi_session: opts.session } : {},
+    cookies: opts.session ? { keystone_session: opts.session } : {},
   });
 }
 
@@ -5250,11 +5250,11 @@ describe('GET /outpost/auth', () => {
   it('returns identity headers, encoding non-ASCII names and commas in group names', async () => {
     const res = await check({ 'x-forwarded-host': 'Wiki.Example.test:443' }, { session: sessionToken });
     expect(res.statusCode).toBe(200);
-    expect(res.headers['x-authi-user']).toBe('zoe');
-    expect(res.headers['x-authi-email']).toBe('zoe@example.test');
-    expect(res.headers['x-authi-uid']).toBe(zoe.id);
-    expect(decodeURIComponent(res.headers['x-authi-name'] as string)).toBe('Zoë Ångström');
-    const groups = (res.headers['x-authi-groups'] as string).split(',').map(decodeURIComponent);
+    expect(res.headers['x-keystone-user']).toBe('zoe');
+    expect(res.headers['x-keystone-email']).toBe('zoe@example.test');
+    expect(res.headers['x-keystone-uid']).toBe(zoe.id);
+    expect(decodeURIComponent(res.headers['x-keystone-name'] as string)).toBe('Zoë Ångström');
+    const groups = (res.headers['x-keystone-groups'] as string).split(',').map(decodeURIComponent);
     expect(groups).toEqual(['R&D, Ops']);
   });
 
@@ -5271,7 +5271,7 @@ describe('GET /outpost/auth', () => {
   it('omits the email header when the user has no email', async () => {
     await ctx.services.users.update(zoe.id, { email: null });
     const res = await check({ 'x-forwarded-host': 'wiki.example.test' }, { session: sessionToken });
-    expect(res.headers['x-authi-email']).toBe('');
+    expect(res.headers['x-keystone-email']).toBe('');
   });
 });
 ```
@@ -5324,11 +5324,11 @@ export function registerForwardAuthRoutes(app: FastifyInstance, s: Services): vo
 
     const groups = await s.users.groupNames(user.id);
     return reply
-      .header('X-Authi-User', user.username)
-      .header('X-Authi-Email', user.email ?? '')
-      .header('X-Authi-Name', encodeURIComponent(user.displayName))
-      .header('X-Authi-Groups', groups.map(encodeURIComponent).join(','))
-      .header('X-Authi-Uid', user.id)
+      .header('X-Keystone-User', user.username)
+      .header('X-Keystone-Email', user.email ?? '')
+      .header('X-Keystone-Name', encodeURIComponent(user.displayName))
+      .header('X-Keystone-Groups', groups.map(encodeURIComponent).join(','))
+      .header('X-Keystone-Uid', user.id)
       .code(200)
       .send();
   });
@@ -5370,7 +5370,7 @@ git commit -m "feat: add forward-auth endpoint for reverse proxies"
   export const USAGE: string;
   export function runCommand(s: Services, argv: string[]): Promise<string>;
   ```
-- CLI: `node dist/cli.js create-api-token <name>` · `create-admin <username> [email]` · `reset-password <username-or-email>` (inside the container: `docker compose exec authi node dist/cli.js …`).
+- CLI: `node dist/cli.js create-api-token <name>` · `create-admin <username> [email]` · `reset-password <username-or-email>` (inside the container: `docker compose exec keystone node dist/cli.js …`).
 
 - [ ] **Step 1: Write the failing test** — `tests/ops.test.ts`
 
@@ -5422,7 +5422,7 @@ describe('runMaintenanceOnce', () => {
 describe('CLI commands', () => {
   it('creates an API token that works', async () => {
     const out = await runCommand(ctx.services, ['create-api-token', 'laptop']);
-    const token = out.match(/authi_[A-Za-z0-9_-]+/)![0];
+    const token = out.match(/keystone_[A-Za-z0-9_-]+/)![0];
     expect(await ctx.services.apiTokens.verify(token)).not.toBeNull();
   });
 
@@ -5507,7 +5507,7 @@ export function startMaintenance(
 import { randomToken } from '../crypto/secrets.js';
 import type { Services } from '../services.js';
 
-export const USAGE = `Usage: authi <command>
+export const USAGE = `Usage: keystone <command>
 
 Commands:
   create-api-token <name>            Create an admin API token (shown once)
@@ -5656,13 +5656,13 @@ docs
 `docker-compose.yml`:
 ```yaml
 services:
-  authi:
+  keystone:
     build: .
-    image: authi:latest
+    image: keystone:latest
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgres://authi:${POSTGRES_PASSWORD}@postgres:5432/authi
+      DATABASE_URL: postgres://keystone:${POSTGRES_PASSWORD}@postgres:5432/keystone
     ports:
       - "9000:9000"
     depends_on:
@@ -5671,23 +5671,23 @@ services:
     # Behind Traefik, replace `ports` with labels like:
     # labels:
     #   - traefik.enable=true
-    #   - traefik.http.routers.authi.rule=Host(`auth.example.com`)
-    #   - traefik.http.services.authi.loadbalancer.server.port=9000
-    #   - traefik.http.middlewares.authi.forwardauth.address=http://authi:9000/outpost/auth
-    #   - traefik.http.middlewares.authi.forwardauth.trustForwardHeader=true
-    #   - traefik.http.middlewares.authi.forwardauth.authResponseHeaders=X-Authi-User,X-Authi-Email,X-Authi-Name,X-Authi-Groups,X-Authi-Uid
+    #   - traefik.http.routers.keystone.rule=Host(`auth.example.com`)
+    #   - traefik.http.services.keystone.loadbalancer.server.port=9000
+    #   - traefik.http.middlewares.keystone.forwardauth.address=http://keystone:9000/outpost/auth
+    #   - traefik.http.middlewares.keystone.forwardauth.trustForwardHeader=true
+    #   - traefik.http.middlewares.keystone.forwardauth.authResponseHeaders=X-Keystone-User,X-Keystone-Email,X-Keystone-Name,X-Keystone-Groups,X-Keystone-Uid
 
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: authi
+      POSTGRES_USER: keystone
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: authi
+      POSTGRES_DB: keystone
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U authi -d authi"]
+      test: ["CMD-SHELL", "pg_isready -U keystone -d keystone"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -5698,27 +5698,27 @@ volumes:
 
 `.env.example`:
 ```
-# Public URL of Auth.i (no trailing slash)
-AUTHI_ISSUER_URL=https://auth.example.com
-# Parent domain shared by Auth.i and forward-auth apps (leave empty to scope cookies to AUTHI_ISSUER_URL's host)
-AUTHI_COOKIE_DOMAIN=.example.com
+# Public URL of Keystone (no trailing slash)
+KEYSTONE_ISSUER_URL=https://auth.example.com
+# Parent domain shared by Keystone and forward-auth apps (leave empty to scope cookies to KEYSTONE_ISSUER_URL's host)
+KEYSTONE_COOKIE_DOMAIN=.example.com
 # openssl rand -base64 32
-AUTHI_SECRET_KEY=
+KEYSTONE_SECRET_KEY=
 # openssl rand -hex 24
 POSTGRES_PASSWORD=
 # First admin, created only when the database has no users
-AUTHI_BOOTSTRAP_ADMIN_USER=admin
-AUTHI_BOOTSTRAP_ADMIN_PASSWORD=
-AUTHI_BOOTSTRAP_ADMIN_EMAIL=
+KEYSTONE_BOOTSTRAP_ADMIN_USER=admin
+KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD=
+KEYSTONE_BOOTSTRAP_ADMIN_EMAIL=
 LOG_LEVEL=info
 ```
 
 - [ ] **Step 6: README** — `README.md`
 
 ````markdown
-# Auth.i
+# Keystone
 
-Self-hosted single sign-on for your own apps. Auth.i is an OpenID Connect provider and a forward-auth
+Self-hosted single sign-on for your own apps. Keystone is an OpenID Connect provider and a forward-auth
 endpoint for Traefik, Caddy and nginx, backed by Postgres and managed through a REST API.
 
 Status: plan 1 of 4 (local users). Next: AD/Entra sign-in sources, SCIM provisioning, admin UI.
@@ -5726,18 +5726,18 @@ Status: plan 1 of 4 (local users). Next: AD/Entra sign-in sources, SCIM provisio
 ## Run it
 
 ```bash
-cp .env.example .env    # fill in AUTHI_SECRET_KEY, POSTGRES_PASSWORD, bootstrap admin password
+cp .env.example .env    # fill in KEYSTONE_SECRET_KEY, POSTGRES_PASSWORD, bootstrap admin password
 docker compose up -d --build
-docker compose exec authi node dist/cli.js create-api-token laptop
+docker compose exec keystone node dist/cli.js create-api-token laptop
 ```
 
-Put Auth.i behind your reverse proxy with TLS at `AUTHI_ISSUER_URL`.
+Put Keystone behind your reverse proxy with TLS at `KEYSTONE_ISSUER_URL`.
 
 ## Connect an app with OIDC
 
 ```bash
 curl -X POST https://auth.example.com/api/v1/applications \
-  -H "Authorization: Bearer $AUTHI_TOKEN" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $KEYSTONE_TOKEN" -H 'Content-Type: application/json' \
   -d '{"slug":"grafana","name":"Grafana","oidcEnabled":true,
        "redirectUris":["https://grafana.example.com/login/generic_oauth"],
        "launchUrl":"https://grafana.example.com"}'
@@ -5758,14 +5758,14 @@ Restrict access with `"allowedGroupIds": ["<group id>"]`.
 
 Create the app with `"forwardAuthEnabled": true, "externalHost": "wiki.example.com"`, then:
 
-Traefik: see the commented labels in `docker-compose.yml` and add the `authi` middleware to the app's router.
+Traefik: see the commented labels in `docker-compose.yml` and add the `keystone` middleware to the app's router.
 
 Caddy:
 ```
 wiki.example.com {
-  forward_auth authi:9000 {
+  forward_auth keystone:9000 {
     uri /outpost/auth
-    copy_headers X-Authi-User X-Authi-Email X-Authi-Name X-Authi-Groups X-Authi-Uid
+    copy_headers X-Keystone-User X-Keystone-Email X-Keystone-Name X-Keystone-Groups X-Keystone-Uid
   }
   reverse_proxy wiki:8080
 }
@@ -5773,17 +5773,17 @@ wiki.example.com {
 
 nginx:
 ```
-location = /authi { internal; proxy_pass http://authi:9000/outpost/auth?mode=nginx;
+location = /keystone { internal; proxy_pass http://keystone:9000/outpost/auth?mode=nginx;
   proxy_set_header X-Forwarded-Host $host; proxy_set_header X-Forwarded-Uri $request_uri;
   proxy_set_header X-Forwarded-Proto $scheme; proxy_pass_request_body off; proxy_set_header Content-Length ""; }
-location / { auth_request /authi; error_page 401 = @login;
-  auth_request_set $authi_user $upstream_http_x_authi_user; proxy_set_header X-Authi-User $authi_user;
+location / { auth_request /keystone; error_page 401 = @login;
+  auth_request_set $keystone_user $upstream_http_x_keystone_user; proxy_set_header X-Keystone-User $keystone_user;
   proxy_pass http://wiki:8080; }
 location @login { return 302 https://auth.example.com/login?rd=$scheme://$host$request_uri; }
 ```
 
-`X-Authi-Name` and each entry of the comma-separated `X-Authi-Groups` are URL-encoded; decode them in the app.
-The app host must sit under `AUTHI_COOKIE_DOMAIN` so the browser sends the Auth.i session cookie.
+`X-Keystone-Name` and each entry of the comma-separated `X-Keystone-Groups` are URL-encoded; decode them in the app.
+The app host must sit under `KEYSTONE_COOKIE_DOMAIN` so the browser sends the Keystone session cookie.
 
 ## API
 
@@ -5804,22 +5804,22 @@ npm test
 
 ```bash
 cat > .env <<EOF
-AUTHI_ISSUER_URL=http://localhost:9000
-AUTHI_SECRET_KEY=$(openssl rand -base64 32)
+KEYSTONE_ISSUER_URL=http://localhost:9000
+KEYSTONE_SECRET_KEY=$(openssl rand -base64 32)
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
-AUTHI_BOOTSTRAP_ADMIN_USER=admin
-AUTHI_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 12)
+KEYSTONE_BOOTSTRAP_ADMIN_USER=admin
+KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 12)
 EOF
 docker compose up -d --build --wait
 curl -fsS http://localhost:9000/healthz
 curl -fsS http://localhost:9000/oidc/.well-known/openid-configuration | head -c 200; echo
-docker compose exec authi node dist/cli.js create-api-token smoke
-docker compose restart authi && docker compose up -d --wait && curl -fsS http://localhost:9000/healthz
-docker compose logs authi | grep -c "bootstrap admin created"
+docker compose exec keystone node dist/cli.js create-api-token smoke
+docker compose restart keystone && docker compose up -d --wait && curl -fsS http://localhost:9000/healthz
+docker compose logs keystone | grep -c "bootstrap admin created"
 docker compose down -v
 rm .env
 ```
-Expected: `{"status":"ok"}` twice, discovery JSON with `"issuer":"http://localhost:9000/oidc"`, a printed `authi_…` token, and the bootstrap log line counted exactly `1` (restart did not recreate the admin).
+Expected: `{"status":"ok"}` twice, discovery JSON with `"issuer":"http://localhost:9000/oidc"`, a printed `keystone_…` token, and the bootstrap log line counted exactly `1` (restart did not recreate the admin).
 
 - [ ] **Step 8: Commit**
 

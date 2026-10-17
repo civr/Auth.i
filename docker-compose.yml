@@ -1,7 +1,7 @@
 services:
-  authi-init:
+  keystone-init:
     build: .
-    image: authi:local
+    image: keystone:local
     restart: "no"
     user: "0:0"
     command: ["node", "scripts/init-data.mjs"]
@@ -10,51 +10,51 @@ services:
     volumes:
       - authi-data:/app/data
 
-  authi:
+  keystone:
     build: .
-    image: authi:local
+    image: keystone:local
     restart: unless-stopped
     environment:
-      AUTHI_ISSUER_URL: ${AUTHI_ISSUER_URL:-http://localhost:9000}
-      AUTHI_COOKIE_DOMAIN: ${AUTHI_COOKIE_DOMAIN:-}
-      AUTHI_TRUST_PROXY: ${AUTHI_TRUST_PROXY:-loopback,linklocal,uniquelocal}
+      KEYSTONE_ISSUER_URL: ${KEYSTONE_ISSUER_URL:-http://localhost:9000}
+      KEYSTONE_COOKIE_DOMAIN: ${KEYSTONE_COOKIE_DOMAIN:-}
+      KEYSTONE_TRUST_PROXY: ${KEYSTONE_TRUST_PROXY:-loopback,linklocal,uniquelocal}
       PORT: 9000
       LOG_LEVEL: info
     ports:
-      - "127.0.0.1:${AUTHI_HOST_PORT:-9000}:9000"
+      - "127.0.0.1:${KEYSTONE_HOST_PORT:-9000}:9000"
     depends_on:
-      authi-init:
+      keystone-init:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
     volumes:
       - authi-data:/app/data
     networks:
-      - authi-internal
+      - keystone-internal
 
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: authi
+      POSTGRES_USER: keystone
       POSTGRES_PASSWORD_FILE: /run/authi-data/postgres-password
-      POSTGRES_DB: authi
+      POSTGRES_DB: keystone
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - authi-data:/run/authi-data:ro
     depends_on:
-      authi-init:
+      keystone-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U authi -d authi"]
+      test: ["CMD-SHELL", "pg_isready -U keystone -d keystone"]
       interval: 5s
       timeout: 3s
       retries: 10
     networks:
-      - authi-internal
+      - keystone-internal
 
 networks:
-  authi-internal:
+  keystone-internal:
     driver: bridge
 
 volumes:
