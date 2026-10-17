@@ -1,3 +1,4 @@
+import { ApiTokenService } from './api/tokens.js';
 import { ApplicationService } from './apps/applications.js';
 import { AuditLog } from './audit/audit.js';
 import { LocalAuthenticator } from './auth/local-login.js';
@@ -22,6 +23,7 @@ export interface Services {
   limiter: LoginRateLimiter;
   localAuth: LocalAuthenticator;
   apps: ApplicationService;
+  apiTokens: ApiTokenService;
 }
 
 export interface ServiceLogger {
@@ -51,5 +53,6 @@ export function createServices(
   const limiter = new LoginRateLimiter(db);
   const localAuth = new LocalAuthenticator(users, limiter, audit);
   const apps = new ApplicationService(db, box, groups);
-  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps };
+  const apiTokens = new ApiTokenService(db);
+  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens };
 }

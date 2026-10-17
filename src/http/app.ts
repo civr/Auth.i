@@ -4,6 +4,7 @@ import formbody from '@fastify/formbody';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { sql } from 'kysely';
 import { ZodError } from 'zod';
+import { registerApi } from '../api/plugin.js';
 import { AppError } from '../errors.js';
 import type { Services } from '../services.js';
 import { registerLoginRoutes } from './login-routes.js';
@@ -91,5 +92,6 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
   });
 
   registerLoginRoutes(app, s);
+  await registerApi(app, s);
   return app;
 }
