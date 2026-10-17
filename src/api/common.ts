@@ -15,8 +15,9 @@ export const usernameSchema = z
   .regex(/^[a-zA-Z0-9._@-]{2,64}$/, 'use 2-64 letters, digits or . _ @ -');
 export const passwordSchema = z.string().min(12, 'must be at least 12 characters').max(256);
 export const httpUrl = z
-  .url({ protocol: /^https?$/ })
-  .refine((u) => !/[\s\u0000-\u001f\u007f]/.test(u), 'must not contain whitespace or control characters');
+  .string()
+  .refine((u) => !/[\s\u0000-\u001f\u007f]/.test(u), 'must not contain whitespace or control characters')
+  .pipe(z.url({ protocol: /^https?$/ }));
 
 export async function recordAudit(
   s: Services,
