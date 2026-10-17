@@ -1,3 +1,4 @@
+import { sql } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Group } from '../src/identity/groups.js';
 import type { User } from '../src/identity/users.js';
@@ -46,6 +47,7 @@ describe('GET /outpost/auth', () => {
   it('redirects anonymous users to the login page with the original URL', async () => {
     const res = await check({ 'x-forwarded-host': 'wiki.example.test' });
     expect(res.statusCode).toBe(302);
+    expect(res.headers['cache-control']).toBe('no-store');
     const location = new URL(res.headers.location as string);
     expect(location.origin + location.pathname).toBe('https://auth.example.test/login');
     expect(location.searchParams.get('rd')).toBe('https://wiki.example.test/page?x=1');
@@ -58,10 +60,22 @@ describe('GET /outpost/auth', () => {
     expect(location.searchParams.get('rd')).toBe('https://wiki.example.test/search?tags=a,b');
   });
 
-  it('uses only the first entry of a comma-separated X-Forwarded-Host/Proto list', async () => {
-    const res = await check({ 'x-forwarded-host': 'wiki.example.test, internal.local', 'x-forwarded-proto': 'https, http' });
-    expect(res.statusCode).toBe(302);
-    expect(new URL(res.headers.location as string).searchParams.get('rd')).toBe('https://wiki.example.test/page?x=1');
+  it('rejects a multi-valued X-Forwarded-Host with 400', async () => {
+    const res = await check({ 'x-forwarded-host': 'b.example.test, wiki.example.test' }, { session: sessionToken });
+    expect(res.statusCode).toBe(400);
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('uses only the first entry of a comma-separated X-Forwarded-Proto list', async () => {
+    const res = await check({ 'x-forwarded-host': 'wiki.example.test', 'x-forwarded-proto': 'http, https' });
+    expect(new URL(res.headers.location as string).searchParams.get('rd')).toBe('http://wiki.example.test/page?x=1');
+  });
+
+  it('fails closed with 500 when the username is not printable ASCII', async () => {
+    await sql`UPDATE users SET username = 'zoë' WHERE id = ${zoe.id}`.execute(ctx.services.db);
+    const res = await check({ 'x-forwarded-host': 'wiki.example.test' }, { session: sessionToken });
+    expect(res.statusCode).toBe(500);
+    expect(res.headers['x-keystone-user']).toBeUndefined();
   });
 
   it('answers 401 for anonymous users in nginx mode', async () => {
@@ -71,6 +85,7 @@ describe('GET /outpost/auth', () => {
   it('returns identity headers, encoding non-ASCII names and commas in group names', async () => {
     const res = await check({ 'x-forwarded-host': 'Wiki.Example.test:443' }, { session: sessionToken });
     expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
     expect(res.headers['x-keystone-user']).toBe('zoe');
     expect(res.headers['x-keystone-email']).toBe('zoe@example.test');
     expect(res.headers['x-keystone-uid']).toBe(zoe.id);

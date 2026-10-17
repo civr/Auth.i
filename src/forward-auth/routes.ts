@@ -22,7 +22,13 @@ function asciiOnly(value: string): string {
 
 export function registerForwardAuthRoutes(app: FastifyInstance, s: Services): void {
   app.get<{ Querystring: { mode?: string } }>('/outpost/auth', async (req, reply) => {
-    const host = listHeader(req, 'x-forwarded-host')?.toLowerCase();
+    reply.header('Cache-Control', 'no-store');
+    // Fail closed on multi-valued hosts: the entry the proxy routed on may not be the one a client supplied.
+    const rawHost = req.headers['x-forwarded-host'];
+    if (Array.isArray(rawHost) ? rawHost.length > 1 || rawHost[0]?.includes(',') : rawHost?.includes(',')) {
+      return reply.code(400).send('Invalid X-Forwarded-Host');
+    }
+    const host = rawHeader(req, 'x-forwarded-host')?.toLowerCase();
     if (!host) return reply.code(400).send('Missing X-Forwarded-Host');
     const proto = listHeader(req, 'x-forwarded-proto')?.toLowerCase() === 'http' ? 'http' : 'https';
     const uri = rawHeader(req, 'x-forwarded-uri') ?? '/';
@@ -49,9 +55,13 @@ export function registerForwardAuthRoutes(app: FastifyInstance, s: Services): vo
       return reply.code(403).send('You do not have access to this application');
     }
 
+    if (asciiOnly(user.username) !== user.username || user.username === '') {
+      req.log.error({ userId: user.id }, 'forward-auth: username is not printable ASCII');
+      return reply.code(500).send('Internal error');
+    }
     const groups = await s.users.groupNames(user.id);
     return reply
-      .header('X-Keystone-User', asciiOnly(user.username))
+      .header('X-Keystone-User', user.username)
       .header('X-Keystone-Email', asciiOnly(user.email ?? ''))
       .header('X-Keystone-Name', encodeURIComponent(user.displayName))
       .header('X-Keystone-Groups', groups.map(encodeURIComponent).join(','))
