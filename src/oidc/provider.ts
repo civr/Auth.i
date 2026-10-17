@@ -33,11 +33,14 @@ export async function createOidcProvider(d: OidcDeps): Promise<Provider> {
   policy.get('login')!.checks.add(
     new interactionPolicy.Check(
       'keystone_session',
-      'Keystone session is missing or belongs to another user',
+      'Keystone session is missing, belongs to another user, or the account may no longer use this client',
+      'login_required',
       async (ctx: KoaContextWithOIDC) => {
         const token = ctx.cookies.get(SESSION_COOKIE, { signed: false });
         const session = await d.sessions.validate(token);
-        return session && session.userId === ctx.oidc.session?.accountId
+        // ctx.oidc.account is undefined when findAccount rejects the user (inactive or lost access); prompting
+        // routes them through the interaction, which returns an audited access_denied instead of a server_error.
+        return session && ctx.oidc.account && session.userId === ctx.oidc.session?.accountId
           ? interactionPolicy.Check.NO_NEED_TO_PROMPT
           : interactionPolicy.Check.REQUEST_PROMPT;
       },
@@ -80,6 +83,7 @@ export async function createOidcProvider(d: OidcDeps): Promise<Provider> {
       groups: ['groups'],
     },
     scopes: ['openid', 'offline_access', 'profile', 'email', 'groups'],
+    responseTypes: ['code'],
     conformIdTokenClaims: false,
     issueRefreshToken: async (_ctx, client) => client.grantTypeAllowed('refresh_token'),
     features: {
@@ -120,7 +124,8 @@ export async function createOidcProvider(d: OidcDeps): Promise<Provider> {
   };
 
   const provider = new Provider(`${d.config.issuerUrl}/oidc`, configuration);
-  // TLS is terminated by the reverse proxy; Fastify's trustProxy governs which client IPs are trusted.
+  // Koa's proxy = true trusts X-Forwarded-* from ANY peer (Fastify's trustProxy does not apply here). Acceptable
+  // because Keystone is only reachable through the TLS-terminating reverse proxy (port bound to loopback).
   provider.proxy = true;
   provider.on('end_session.success', (ctx: KoaContextWithOIDC) => {
     const token = ctx.cookies.get(SESSION_COOKIE, { signed: false });

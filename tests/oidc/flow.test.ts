@@ -69,6 +69,7 @@ describe('OIDC provider', () => {
   it('publishes discovery and a JWKS with RS256 and ES256 keys', async () => {
     const config = await discover();
     expect(config.serverMetadata().issuer).toBe(`${ctx.baseUrl}/oidc`);
+    expect(config.serverMetadata().response_types_supported).toEqual(['code']);
     const jwks = await (await fetch(config.serverMetadata().jwks_uri!)).json();
     expect(jwks.keys.map((k: { alg: string }) => k.alg).sort()).toEqual(['ES256', 'RS256']);
     expect(jwks.keys.every((k: { d?: string }) => k.d === undefined)).toBe(true);
@@ -120,6 +121,26 @@ describe('OIDC provider', () => {
     const { page } = await authorize(browser, config);
     const done = await browser.signIn(page, 'alice', TEST_PASSWORD, isCallback);
     expect(done.url.searchParams.get('error')).toBe('access_denied');
+  });
+
+  it('denies re-authorization with an existing session after the user loses access', async () => {
+    const config = await discover();
+    const browser = new TestBrowser();
+    await signInAndExchange(browser, config);
+    await ctx.services.groups.removeMember(staff.id, alice.id);
+    const { page } = await authorize(browser, config);
+    expect(isCallback(page.url)).toBe(true);
+    expect(page.url.searchParams.get('error')).toBe('access_denied');
+  });
+
+  it('answers prompt=none with an existing session after access removal by redirecting an error to the RP', async () => {
+    const config = await discover();
+    const browser = new TestBrowser();
+    await signInAndExchange(browser, config);
+    await ctx.services.groups.removeMember(staff.id, alice.id);
+    const { page } = await authorize(browser, config, { prompt: 'none' });
+    expect(isCallback(page.url)).toBe(true);
+    expect(page.url.searchParams.get('error')).toBe('login_required');
   });
 
   it('stops refreshing once the user loses access to the app', async () => {
