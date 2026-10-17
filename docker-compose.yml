@@ -19,7 +19,14 @@ services:
       KEYSTONE_COOKIE_DOMAIN: ${KEYSTONE_COOKIE_DOMAIN:-}
       KEYSTONE_TRUST_PROXY: ${KEYSTONE_TRUST_PROXY:-loopback,linklocal,uniquelocal}
       PORT: 9000
-      LOG_LEVEL: info
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Empty values are treated as unset. Without KEYSTONE_SECRET_KEY, the key is generated
+      # once into the authi-data volume (secret.key).
+      KEYSTONE_SECRET_KEY: ${KEYSTONE_SECRET_KEY:-}
+      # First admin, created only while the database has no users.
+      KEYSTONE_BOOTSTRAP_ADMIN_USER: ${KEYSTONE_BOOTSTRAP_ADMIN_USER:-}
+      KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD: ${KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD:-}
+      KEYSTONE_BOOTSTRAP_ADMIN_EMAIL: ${KEYSTONE_BOOTSTRAP_ADMIN_EMAIL:-}
     ports:
       - "127.0.0.1:${KEYSTONE_HOST_PORT:-9000}:9000"
     depends_on:
@@ -31,6 +38,16 @@ services:
       - authi-data:/app/data
     networks:
       - keystone-internal
+    # Behind Traefik, add labels like these. Traefik must either join the keystone-internal
+    # network (so http://keystone:9000 resolves) or target the loopback port
+    # http://127.0.0.1:${KEYSTONE_HOST_PORT:-9000} when it runs on the host.
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.keystone.rule=Host(`auth.example.com`)
+    #   - traefik.http.services.keystone.loadbalancer.server.port=9000
+    #   - traefik.http.middlewares.keystone.forwardauth.address=http://keystone:9000/outpost/auth
+    #   - traefik.http.middlewares.keystone.forwardauth.trustForwardHeader=true
+    #   - traefik.http.middlewares.keystone.forwardauth.authResponseHeaders=X-Keystone-User,X-Keystone-Email,X-Keystone-Name,X-Keystone-Groups,X-Keystone-Uid
 
   postgres:
     image: postgres:17-alpine

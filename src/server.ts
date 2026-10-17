@@ -1,35 +1,59 @@
-import Fastify from 'fastify';
-import { Pool } from 'pg';
+import type { FastifyBaseLogger } from 'fastify';
+import { ensureBootstrapAdmin } from './bootstrap.js';
 import { loadConfig } from './config.js';
+import { createDb } from './db/db.js';
+import { runMigrations } from './db/migrate.js';
+import { buildApp } from './http/app.js';
+import { startMaintenance } from './maintenance.js';
+import { createServices, startServices } from './services.js';
 
 const config = loadConfig();
-const db = new Pool({ connectionString: config.databaseUrl });
-const app = Fastify({
-  logger: { level: config.logLevel },
-  trustProxy: config.trustProxy.split(',').map((entry) => entry.trim()).filter(Boolean),
-});
+const db = createDb(config.databaseUrl);
+await runMigrations(db);
 
-app.get('/healthz', async (_request, reply) => {
-  try {
-    await db.query('SELECT 1');
-    return { status: 'ok' };
-  } catch (error) {
-    app.log.error({ err: error }, 'database health check failed');
-    return reply.code(503).send({ status: 'unavailable' });
-  }
+// Services exist before the Fastify logger does; route event-handler errors to it once it is available.
+let log: FastifyBaseLogger | undefined;
+const services = createServices(config, db, {
+  logger: {
+    error: (obj, msg) => (log ? log.error(obj, msg) : console.error(msg, obj)),
+  },
 });
+await startServices(services);
+
+const app = await buildApp(services, { logger: { level: config.logLevel } });
+log = app.log;
+
+if ((await ensureBootstrapAdmin(services)) === 'created') {
+  app.log.info({ username: config.bootstrapAdmin?.username }, 'bootstrap admin created');
+}
+const stopMaintenance = startMaintenance(services, (err) => app.log.error({ err }, 'maintenance failed'));
+
+let shuttingDown = false;
+async function shutdown(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  stopMaintenance();
+  await app.close();
+  await db.destroy();
+}
 
 try {
   await app.listen({ host: '0.0.0.0', port: config.port });
 } catch (error) {
   app.log.error({ err: error }, 'server failed to start');
-  await db.end();
+  await shutdown();
   process.exitCode = 1;
 }
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, async () => {
-    await app.close();
-    await db.end();
+    app.log.info({ signal }, 'shutting down');
+    try {
+      await shutdown();
+    } catch (error) {
+      app.log.error({ err: error }, 'shutdown failed');
+      process.exitCode = 1;
+    }
+    process.exit();
   });
 }
