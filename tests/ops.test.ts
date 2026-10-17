@@ -95,6 +95,17 @@ describe('CLI commands', () => {
     expect(await ctx.services.sessions.validate(token)).toBeNull();
   });
 
+  it('reset-password clears login rate-limit attempts for username and email', async () => {
+    const user = await ctx.services.users.create({ username: 'alice', email: 'alice@example.test', password: TEST_PASSWORD });
+    for (let i = 0; i < 3; i++) {
+      await ctx.services.limiter.reserve('9.9.9.9', 'alice');
+      await ctx.services.limiter.reserve('9.9.9.9', 'alice@example.test');
+    }
+    await runCommand(ctx.services, ['reset-password', user.username]);
+    const rows = await ctx.services.db.selectFrom('login_attempts').select('key').where('key', 'like', 'user:%').execute();
+    expect(rows).toEqual([]);
+  });
+
   it('reports usage and errors', async () => {
     expect(await runCommand(ctx.services, [])).toBe(USAGE);
     await expect(runCommand(ctx.services, ['create-api-token'])).rejects.toThrow(/Usage/);

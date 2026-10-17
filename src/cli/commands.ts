@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { passwordSchema, usernameSchema } from '../api/common.js';
 import { randomToken } from '../crypto/secrets.js';
+import { revokeOidcForAccount } from '../oidc/adapter.js';
 import type { Services } from '../services.js';
 
 export const USAGE = `Usage: keystone <command>
@@ -48,6 +49,9 @@ export async function runCommand(s: Services, argv: string[]): Promise<string> {
       const password = generatePassword();
       await s.users.setPassword(found.user.id, password);
       await s.sessions.destroyAllForUser(found.user.id);
+      await revokeOidcForAccount(s.db, found.user.id);
+      await s.limiter.clear(found.user.username);
+      if (found.user.email) await s.limiter.clear(found.user.email);
       await s.audit.record({ actor: { type: 'system' }, action: 'user.password_set', target: found.user.id, details: { via: 'cli' } });
       return `Password for "${found.user.username}" reset.\nPassword: ${password}`;
     }
