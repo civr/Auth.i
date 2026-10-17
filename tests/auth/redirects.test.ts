@@ -18,6 +18,8 @@ describe('isSafeRedirect', () => {
     'http://app.example.com/',
     'https://deep.sub.example.com/',
     'https://GRAFANA.homelab.net/d/1',
+    'HTTPS://app.example.com/x',
+    'https://app.example.com\\@evil.com',
   ])('accepts %s', (target) => {
     expect(isSafeRedirect(target, rules)).toBe(true);
   });
@@ -42,6 +44,11 @@ describe('isSafeRedirect', () => {
     'ftp://app.example.com',
     'relative/path',
     '',
+    'https://app.example.com/\r\nSet-Cookie: a=b',
+    'https:app.example.com',
+    'JavaScript:alert(1)',
+    ' //evil.com',
+    'https://evil.com\\@app.example.com',
   ])('rejects %j', (target) => {
     expect(isSafeRedirect(target, rules)).toBe(false);
   });
@@ -53,7 +60,27 @@ describe('isSafeRedirect', () => {
   });
 });
 
+describe('isSafeRedirect edge cases', () => {
+  it('rejects a bare dot cookie domain and does not match trailing-dot hosts', () => {
+    const dotOnly = { issuerUrl: 'https://auth.example.com', cookieDomain: '.' };
+    expect(isSafeRedirect('https://evil.com.', dotOnly)).toBe(false);
+    expect(isSafeRedirect('https://app.example.com/', dotOnly)).toBe(false);
+    const emptyDomain = { issuerUrl: 'https://auth.example.com', cookieDomain: '' };
+    expect(isSafeRedirect('https://evil.com.', emptyDomain)).toBe(false);
+  });
+});
+
 describe('safeRedirectTarget', () => {
+  it('returns the canonical href for absolute targets', () => {
+    expect(safeRedirectTarget('HTTPS://GRAFANA.homelab.net/d/1', rules)).toBe(
+      'https://grafana.homelab.net/d/1',
+    );
+    expect(safeRedirectTarget('https://app.example.com/a b', rules)).toBe('/');
+  });
+  it('falls back instead of returning header-unsafe input', () => {
+    expect(safeRedirectTarget('https://app.example.com/\r\nSet-Cookie: a=b', rules)).toBe('/');
+  });
+
   it('falls back for unsafe or non-string input', () => {
     expect(safeRedirectTarget('https://evil.com', rules)).toBe('/');
     expect(safeRedirectTarget(undefined, rules)).toBe('/');
