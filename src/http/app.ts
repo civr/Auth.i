@@ -62,10 +62,18 @@ function sendError(req: FastifyRequest, reply: FastifyReply, e: DescribedError):
   });
 }
 
+/** 'true'/'false' become booleans; anything else is a comma-separated list of addresses or presets. */
+export function parseTrustProxy(value: string): boolean | string[] {
+  const v = value.trim().toLowerCase();
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return value.split(',').map((e) => e.trim()).filter(Boolean);
+}
+
 export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: opts.logger ?? false,
-    trustProxy: s.config.trustProxy.split(',').map((e) => e.trim()).filter(Boolean),
+    trustProxy: parseTrustProxy(s.config.trustProxy),
   });
   await app.register(cookie);
   await app.register(formbody);
