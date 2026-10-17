@@ -10,7 +10,9 @@ import type { Db } from './db/db.js';
 import { EventBus, type DomainEvent } from './events/bus.js';
 import { GroupService } from './identity/groups.js';
 import { UserService } from './identity/users.js';
+import { OidcProviderHolder } from './oidc/holder.js';
 import { SigningKeyService } from './oidc/keys.js';
+import { createOidcProvider } from './oidc/provider.js';
 
 export interface Services {
   config: Config;
@@ -26,6 +28,7 @@ export interface Services {
   apps: ApplicationService;
   apiTokens: ApiTokenService;
   keys: SigningKeyService;
+  oidc: OidcProviderHolder;
 }
 
 export interface ServiceLogger {
@@ -58,5 +61,13 @@ export function createServices(
   const apps = new ApplicationService(db, box, groups);
   const apiTokens = new ApiTokenService(db);
   const keys = new SigningKeyService(db, keyBox);
-  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys };
+  const oidc = new OidcProviderHolder(() =>
+    createOidcProvider({ config, db, users, groups, apps, sessions, keys, audit }),
+  );
+  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys, oidc };
+}
+
+export async function startServices(s: Services): Promise<void> {
+  await s.keys.ensureKeys();
+  await s.oidc.load();
 }

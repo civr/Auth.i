@@ -1,12 +1,15 @@
-import { STATUS_CODES } from 'node:http';
+import { STATUS_CODES, type IncomingMessage, type ServerResponse } from 'node:http';
 import cookie from '@fastify/cookie';
 import formbody from '@fastify/formbody';
+import middie from '@fastify/middie';
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { sql } from 'kysely';
+import { errors as oidcErrors } from 'oidc-provider';
 import { ZodError } from 'zod';
 import { registerApi } from '../api/plugin.js';
 import { AppError } from '../errors.js';
 import type { Services } from '../services.js';
+import { registerInteractionRoutes } from './interaction-routes.js';
 import { registerLoginRoutes } from './login-routes.js';
 import { renderPage } from './views.js';
 
@@ -22,6 +25,13 @@ interface DescribedError {
 }
 
 function describeError(err: unknown): DescribedError {
+  if (err instanceof oidcErrors.SessionNotFound) {
+    return {
+      status: 400,
+      title: 'Sign-in expired',
+      detail: 'Your sign-in request expired. Go back to the application and try again.',
+    };
+  }
   if (err instanceof ZodError) {
     return {
       status: 400,
@@ -58,6 +68,9 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
   });
   await app.register(cookie);
   await app.register(formbody);
+  await app.register(middie);
+  // oidc-provider is a Koa app; middie hands it the raw request before Fastify parses the body.
+  app.use('/oidc', (req: IncomingMessage, res: ServerResponse) => s.oidc.handle(req, res));
 
   app.addHook('onSend', async (_req, reply, payload) => {
     reply.header('X-Content-Type-Options', 'nosniff');
@@ -92,6 +105,7 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
   });
 
   registerLoginRoutes(app, s);
+  registerInteractionRoutes(app, s);
   await registerApi(app, s);
   return app;
 }

@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { Config } from '../../src/config.js';
 import { buildApp } from '../../src/http/app.js';
-import { createServices, type Services } from '../../src/services.js';
+import { createServices, startServices, type Services } from '../../src/services.js';
 import { createTestDb } from './db.js';
+import { getFreePort } from './net.js';
 
 export const TEST_PASSWORD = 'correct-horse-battery';
 
@@ -30,6 +31,7 @@ export interface TestContext {
 export async function createTestContext(overrides: Partial<Config> = {}): Promise<TestContext> {
   const tdb = await createTestDb();
   const services = createServices(testConfig({ databaseUrl: tdb.url, ...overrides }), tdb.db);
+  await startServices(services);
   const app = await buildApp(services);
   return {
     services,
@@ -39,4 +41,16 @@ export async function createTestContext(overrides: Partial<Config> = {}): Promis
       await tdb.destroy();
     },
   };
+}
+
+export interface ListeningContext extends TestContext {
+  baseUrl: string;
+}
+
+export async function createListeningContext(): Promise<ListeningContext> {
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const ctx = await createTestContext({ issuerUrl: baseUrl, port });
+  await ctx.app.listen({ port, host: '127.0.0.1' });
+  return { ...ctx, baseUrl };
 }

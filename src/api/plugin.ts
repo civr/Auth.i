@@ -6,6 +6,7 @@ import { registerApplicationRoutes } from './applications.js';
 import { registerAuditRoutes } from './audit.js';
 import './common.js';
 import { registerGroupRoutes } from './groups.js';
+import { registerKeyRoutes } from './keys.js';
 import { registerUserRoutes } from './users.js';
 
 export async function registerApi(app: FastifyInstance, s: Services): Promise<void> {
@@ -23,6 +24,7 @@ export async function registerApi(app: FastifyInstance, s: Services): Promise<vo
       registerApplicationRoutes(api, s);
       registerApiTokenRoutes(api, s);
       registerAuditRoutes(api, s);
+      registerKeyRoutes(api, s);
     },
     { prefix: '/api/v1' },
   );
