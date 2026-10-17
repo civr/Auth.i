@@ -1,4 +1,5 @@
 import type { Adapter, AdapterPayload } from 'oidc-provider';
+import { sql } from 'kysely';
 import type { Db } from '../db/db.js';
 
 export class PostgresAdapter implements Adapter {
@@ -68,4 +69,28 @@ export class PostgresAdapter implements Adapter {
 export async function purgeExpiredOidcPayloads(db: Db): Promise<number> {
   const result = await db.deleteFrom('oidc_payloads').where('expires_at', '<=', new Date()).executeTakeFirst();
   return Number(result.numDeletedRows);
+}
+
+/**
+ * Deletes every OIDC artifact (sessions, grants, access/refresh tokens, codes) belonging to an account,
+ * plus any row linked to one of those grants. Call when a user's access ends or their credentials change.
+ */
+export async function revokeOidcForAccount(db: Db, accountId: string): Promise<void> {
+  await db
+    .deleteFrom('oidc_payloads')
+    .where((eb) =>
+      eb.or([
+        eb(sql`payload->>'accountId'`, '=', accountId),
+        eb(
+          'grant_id',
+          'in',
+          eb
+            .selectFrom('oidc_payloads')
+            .select('grant_id')
+            .where(sql`payload->>'accountId'`, '=', accountId)
+            .where('grant_id', 'is not', null),
+        ),
+      ]),
+    )
+    .execute();
 }

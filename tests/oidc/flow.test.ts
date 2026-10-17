@@ -195,4 +195,33 @@ describe('OIDC provider', () => {
     const tokens = await signInAndExchange(new TestBrowser(), await discover());
     expect(tokens.claims()?.sub).toBe(alice.id);
   });
+
+  it('revokes issued access tokens when the user is deactivated through the API', async () => {
+    const config = await discover();
+    const tokens = await signInAndExchange(new TestBrowser(), config);
+    expect((await client.tokenIntrospection(config, tokens.access_token)).active).toBe(true);
+    const { token } = await ctx.services.apiTokens.create({ name: 'test' });
+    const res = await fetch(`${ctx.baseUrl}/api/v1/users/${alice.id}`, {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    });
+    expect(res.status).toBe(200);
+    expect((await client.tokenIntrospection(config, tokens.access_token)).active).toBe(false);
+  });
+
+  it('revokes refresh tokens when an admin sets the password of an active user', async () => {
+    const config = await discover();
+    const tokens = await signInAndExchange(new TestBrowser(), config);
+    const { token } = await ctx.services.apiTokens.create({ name: 'test' });
+    const res = await fetch(`${ctx.baseUrl}/api/v1/users/${alice.id}/password`, {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'another-long-password' }),
+    });
+    expect(res.status).toBe(204);
+    await expect(client.refreshTokenGrant(config, tokens.refresh_token!)).rejects.toMatchObject({
+      error: 'invalid_grant',
+    });
+  });
 });

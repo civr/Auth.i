@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { revokeOidcForAccount } from '../oidc/adapter.js';
 import { NotFoundError } from '../errors.js';
 import type { Services } from '../services.js';
 import { idParams, passwordSchema, recordAudit, usernameSchema } from './common.js';
@@ -43,7 +44,10 @@ export function registerUserRoutes(api: FastifyInstance, s: Services): void {
     const { id } = idParams.parse(req.params);
     const body = updateUserBody.parse(req.body);
     const user = await s.users.update(id, body);
-    if (body.isActive === false) await s.sessions.destroyAllForUser(id);
+    if (body.isActive === false) {
+      await s.sessions.destroyAllForUser(id);
+      await revokeOidcForAccount(s.db, id);
+    }
     await recordAudit(s, req, 'user.update', id, { fields: Object.keys(body) });
     return user;
   });
@@ -51,6 +55,7 @@ export function registerUserRoutes(api: FastifyInstance, s: Services): void {
   api.delete('/users/:id', async (req, reply) => {
     const { id } = idParams.parse(req.params);
     await s.users.delete(id);
+    await revokeOidcForAccount(s.db, id);
     await recordAudit(s, req, 'user.delete', id);
     return reply.code(204).send();
   });
@@ -60,6 +65,7 @@ export function registerUserRoutes(api: FastifyInstance, s: Services): void {
     const { password } = z.object({ password: passwordSchema }).strict().parse(req.body);
     await s.users.setPassword(id, password);
     await s.sessions.destroyAllForUser(id);
+    await revokeOidcForAccount(s.db, id);
     await recordAudit(s, req, 'user.password_set', id);
     return reply.code(204).send();
   });
@@ -68,6 +74,7 @@ export function registerUserRoutes(api: FastifyInstance, s: Services): void {
     const { id } = idParams.parse(req.params);
     if (!(await s.users.get(id))) throw new NotFoundError('User not found');
     await s.sessions.destroyAllForUser(id);
+    await revokeOidcForAccount(s.db, id);
     await recordAudit(s, req, 'user.sessions_revoked', id);
     return reply.code(204).send();
   });
