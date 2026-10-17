@@ -77,6 +77,19 @@ The response holds `clientSecret` (shown once). Configure the app with:
 The issuer is always `KEYSTONE_ISSUER_URL` plus `/oidc`. Restrict access with
 `"allowedGroupIds": ["<group id>"]`.
 
+### Reverse proxy for Keystone's own host
+
+The proxy in front of Keystone itself must set (overwrite, not append) `X-Forwarded-Host` and
+`X-Forwarded-Proto`; oidc-provider builds the discovery endpoint URLs from them. nginx:
+```
+location / {
+  proxy_pass http://127.0.0.1:9000;
+  proxy_set_header X-Forwarded-Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+`KEYSTONE_TRUST_PROXY` accepts `true`, `false` or a comma-separated list of addresses/presets.
+
 ## Protect an app without OIDC (forward-auth)
 
 Create the app with `"forwardAuthEnabled": true, "externalHost": "wiki.example.com"`, then point the
@@ -148,7 +161,8 @@ The preview server binds only to loopback.
 - `postgres`: Postgres 17; no host port is published, and persistent files live in `postgres-data`.
 
 Both services use a dedicated private bridge network. Change `KEYSTONE_HOST_PORT` if port 9000 is
-already occupied. Do not expose the service directly to the internet; terminate TLS at the existing
+already occupied, and change `KEYSTONE_ISSUER_URL` to match (the issuer defaults to
+`http://localhost:9000`). Do not expose the service directly to the internet; terminate TLS at the existing
 reverse proxy.
 
 ## Development
