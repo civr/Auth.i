@@ -10,6 +10,7 @@ import type { Db } from './db/db.js';
 import { EventBus, type DomainEvent } from './events/bus.js';
 import { GroupService } from './identity/groups.js';
 import { UserService } from './identity/users.js';
+import { SigningKeyService } from './oidc/keys.js';
 
 export interface Services {
   config: Config;
@@ -24,6 +25,7 @@ export interface Services {
   localAuth: LocalAuthenticator;
   apps: ApplicationService;
   apiTokens: ApiTokenService;
+  keys: SigningKeyService;
 }
 
 export interface ServiceLogger {
@@ -54,5 +56,6 @@ export function createServices(
   const localAuth = new LocalAuthenticator(users, limiter, audit);
   const apps = new ApplicationService(db, box, groups);
   const apiTokens = new ApiTokenService(db);
-  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens };
+  const keys = new SigningKeyService(db, box);
+  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys };
 }
