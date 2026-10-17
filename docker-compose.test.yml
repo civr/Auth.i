@@ -1,3 +1,4 @@
+name: keystone-test
 services:
   postgres-test:
     image: postgres:17-alpine
