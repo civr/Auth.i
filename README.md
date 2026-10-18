@@ -165,6 +165,21 @@ already occupied, and change `KEYSTONE_ISSUER_URL` to match (the issuer defaults
 `http://localhost:9000`). Do not expose the service directly to the internet; terminate TLS at the existing
 reverse proxy.
 
+### Direct access on a LAN (no reverse proxy)
+
+By default the port only listens on `127.0.0.1`, so other machines cannot reach it. To open it by
+IP on a trusted local network, create `.env` next to `docker-compose.yml`:
+
+```sh
+KEYSTONE_BIND_ADDRESS=0.0.0.0
+KEYSTONE_ISSUER_URL=http://192.168.1.10:9000   # the address people type in the browser
+```
+
+Then run `docker compose up -d`. This is plain HTTP, so passwords and session cookies cross the
+network unencrypted. Keystone also trusts `X-Forwarded-*` headers when it is reached directly.
+Use it only on a network you trust, and put a TLS reverse proxy or a Cloudflare Tunnel in front
+before you expose it to the internet.
+
 ## Development
 
 ```bash

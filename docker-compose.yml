@@ -28,8 +28,9 @@ services:
       KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD: ${KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD:-}
       KEYSTONE_BOOTSTRAP_ADMIN_EMAIL: ${KEYSTONE_BOOTSTRAP_ADMIN_EMAIL:-}
     ports:
-      # If you change KEYSTONE_HOST_PORT, also set KEYSTONE_ISSUER_URL to match (default http://localhost:9000).
-      - "127.0.0.1:${KEYSTONE_HOST_PORT:-9000}:9000"
+      # Loopback by default (reverse proxy on this host). Set KEYSTONE_BIND_ADDRESS=0.0.0.0 to reach Keystone directly by IP.
+      # If you change the address or KEYSTONE_HOST_PORT, set KEYSTONE_ISSUER_URL to the URL people actually open.
+      - "${KEYSTONE_BIND_ADDRESS:-127.0.0.1}:${KEYSTONE_HOST_PORT:-9000}:9000"
     depends_on:
       keystone-init:
         condition: service_completed_successfully
