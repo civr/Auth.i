@@ -13,6 +13,8 @@ import { UserService } from './identity/users.js';
 import { OidcProviderHolder } from './oidc/holder.js';
 import { SigningKeyService } from './oidc/keys.js';
 import { createOidcProvider } from './oidc/provider.js';
+import type { SettingKey } from './settings/keys.js';
+import { SettingsService } from './settings/settings.js';
 
 export interface Services {
   config: Config;
@@ -29,6 +31,8 @@ export interface Services {
   apiTokens: ApiTokenService;
   keys: SigningKeyService;
   oidc: OidcProviderHolder;
+  settings: SettingsService;
+  log: ServiceLogger;
 }
 
 export interface ServiceLogger {
@@ -43,16 +47,15 @@ export function createServices(
   const box = createSecretBox(config.secretKey, 'client-secrets');
   const keyBox = createSecretBox(config.secretKey, 'signing-keys');
   // Failing event handlers must never vanish silently: log them unless the caller handles them.
+  const log: ServiceLogger = opts.logger ?? { error: (obj, msg) => console.error(msg, obj) };
   const onEventError =
     opts.onEventError ??
     ((err: unknown, event: DomainEvent) => {
-      const logger: ServiceLogger = opts.logger ?? {
-        error: (obj, msg) => console.error(msg, obj),
-      };
-      logger.error({ err, event }, 'event handler failed');
+      log.error({ err, event }, 'event handler failed');
     });
   const events = new EventBus(onEventError);
   const audit = new AuditLog(db);
+  const settings = new SettingsService(db, config, events, audit);
   const users = new UserService(db, events);
   const groups = new GroupService(db, events);
   const sessions = new SessionService(db);
@@ -62,12 +65,28 @@ export function createServices(
   const apiTokens = new ApiTokenService(db);
   const keys = new SigningKeyService(db, keyBox);
   const oidc = new OidcProviderHolder(() =>
-    createOidcProvider({ config, db, users, groups, apps, sessions, keys, audit }),
+    createOidcProvider({ config, db, users, groups, apps, sessions, keys, audit, settings }),
   );
-  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys, oidc };
+  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys, oidc, settings, log };
 }
 
 export async function startServices(s: Services): Promise<void> {
+  await s.settings.load();
   await s.keys.ensureKeys();
   await s.oidc.load();
+}
+
+/** Applies settings that need more than a fresh read: rebuilds the OIDC provider when its inputs changed. */
+export async function applySettingsChange(
+  s: Services,
+  changed: readonly SettingKey[],
+): Promise<{ oidcReloadFailed: boolean }> {
+  if (!changed.some((k) => k === 'issuerUrl' || k === 'cookieDomain')) return { oidcReloadFailed: false };
+  try {
+    await s.oidc.load();
+    return { oidcReloadFailed: false };
+  } catch (err) {
+    s.log.error({ err }, 'OIDC provider reload failed; keeping the previous provider');
+    return { oidcReloadFailed: true };
+  }
 }

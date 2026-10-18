@@ -73,7 +73,7 @@ export function parseTrustProxy(value: string): boolean | string[] {
 export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: opts.logger ?? false,
-    trustProxy: parseTrustProxy(s.config.trustProxy),
+    trustProxy: parseTrustProxy(s.settings.current().trustProxy),
   });
   await app.register(cookie);
   await app.register(formbody);
@@ -89,7 +89,7 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
       'Content-Security-Policy',
       "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'",
     );
-    if (s.config.secureCookies) reply.header('Strict-Transport-Security', 'max-age=31536000');
+    if (s.settings.current().secureCookies) reply.header('Strict-Transport-Security', 'max-age=31536000');
     return payload;
   });
 

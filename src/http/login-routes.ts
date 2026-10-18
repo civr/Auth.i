@@ -17,7 +17,7 @@ export function registerLoginRoutes(app: FastifyInstance, s: Services): void {
   ) =>
     renderPage(reply, 'login', {
       title: 'Sign in',
-      csrf: issueCsrfToken(req, reply, s.config),
+      csrf: issueCsrfToken(req, reply, s.settings.current()),
       rd: data.rd,
       error: data.error ?? null,
       identifier: data.identifier ?? '',
@@ -53,7 +53,7 @@ export function registerLoginRoutes(app: FastifyInstance, s: Services): void {
       ip: req.ip,
       ...(req.headers['user-agent'] ? { userAgent: req.headers['user-agent'] } : {}),
     });
-    reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(s.config, s.sessions.ttlSeconds));
+    reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(s.settings.current(), s.sessions.ttlSeconds));
     return reply.redirect(rd);
   });
 
@@ -64,7 +64,7 @@ export function registerLoginRoutes(app: FastifyInstance, s: Services): void {
       await s.sessions.destroy(token);
       if (session) await s.audit.record({ actor: { type: 'user', id: session.userId }, action: 'logout', ip: req.ip });
     }
-    reply.clearCookie(SESSION_COOKIE, sessionCookieOptions(s.config));
+    reply.clearCookie(SESSION_COOKIE, sessionCookieOptions(s.settings.current()));
     return reply.redirect('/login?loggedOut=1');
   };
   app.get('/logout', logout);

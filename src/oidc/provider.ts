@@ -9,6 +9,7 @@ import type { Db } from '../db/db.js';
 import type { GroupService } from '../identity/groups.js';
 import type { UserService } from '../identity/users.js';
 import { PostgresAdapter } from './adapter.js';
+import type { SettingsService } from '../settings/settings.js';
 import type { SigningKeyService } from './keys.js';
 
 export interface OidcDeps {
@@ -20,6 +21,7 @@ export interface OidcDeps {
   sessions: SessionService;
   keys: SigningKeyService;
   audit: AuditLog;
+  settings: SettingsService;
 }
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -123,7 +125,7 @@ export async function createOidcProvider(d: OidcDeps): Promise<Provider> {
     },
   };
 
-  const provider = new Provider(`${d.config.issuerUrl}/oidc`, configuration);
+  const provider = new Provider(`${d.settings.current().issuerUrl}/oidc`, configuration);
   // Koa's proxy = true trusts X-Forwarded-* from ANY peer (Fastify's trustProxy does not apply here). Acceptable
   // because Keystone is only reachable through the TLS-terminating reverse proxy (port bound to loopback).
   provider.proxy = true;

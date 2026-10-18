@@ -42,7 +42,7 @@ export function registerForwardAuthRoutes(app: FastifyInstance, s: Services): vo
     if (!user) {
       if (req.query.mode === 'nginx') return reply.code(401).send('Authentication required');
       const target = safeRedirectTarget(original, await redirectRules(s), '/');
-      return reply.redirect(`${s.config.issuerUrl}/login?rd=${encodeURIComponent(target)}`, 302);
+      return reply.redirect(`${s.settings.current().issuerUrl}/login?rd=${encodeURIComponent(target)}`, 302);
     }
 
     if (!canAccess(user, await s.groups.groupIdsForUser(user.id), application)) {
