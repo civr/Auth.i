@@ -13,6 +13,7 @@ import { UserService } from './identity/users.js';
 import { OidcProviderHolder } from './oidc/holder.js';
 import { SigningKeyService } from './oidc/keys.js';
 import { createOidcProvider } from './oidc/provider.js';
+import { SetupService } from './setup/setup.js';
 import type { SettingKey } from './settings/keys.js';
 import { SettingsService } from './settings/settings.js';
 
@@ -32,6 +33,7 @@ export interface Services {
   keys: SigningKeyService;
   oidc: OidcProviderHolder;
   settings: SettingsService;
+  setup: SetupService;
   log: ServiceLogger;
 }
 
@@ -64,10 +66,11 @@ export function createServices(
   const apps = new ApplicationService(db, box, groups);
   const apiTokens = new ApiTokenService(db);
   const keys = new SigningKeyService(db, keyBox);
+  const setup = new SetupService({ db, users, settings, audit }, new LoginRateLimiter(db, { maxPerIp: 5, maxPerUser: 1000 }));
   const oidc = new OidcProviderHolder(() =>
     createOidcProvider({ config, db, users, groups, apps, sessions, keys, audit, settings }),
   );
-  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys, oidc, settings, log };
+  return { config, db, box, events, audit, users, groups, sessions, limiter, localAuth, apps, apiTokens, keys, oidc, settings, setup, log };
 }
 
 export async function startServices(s: Services): Promise<void> {

@@ -12,10 +12,13 @@ import type { Services } from '../services.js';
 import { registerForwardAuthRoutes } from '../forward-auth/routes.js';
 import { registerInteractionRoutes } from './interaction-routes.js';
 import { registerLoginRoutes } from './login-routes.js';
+import { registerSetupGate, registerSetupRoutes } from './setup-routes.js';
 import { renderPage } from './views.js';
 
 export interface BuildAppOptions {
   logger?: boolean | { level: string };
+  setupGate?: boolean;
+  onRestart?: () => void;
 }
 
 interface DescribedError {
@@ -77,6 +80,7 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
   });
   await app.register(cookie);
   await app.register(formbody);
+  if (opts.setupGate ?? true) registerSetupGate(app, s);
   await app.register(middie);
   // oidc-provider is a Koa app; middie hands it the raw request before Fastify parses the body.
   app.use('/oidc', (req: IncomingMessage, res: ServerResponse) => s.oidc.handle(req, res));
@@ -114,6 +118,7 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
   });
 
   registerLoginRoutes(app, s);
+  registerSetupRoutes(app, s);
   registerInteractionRoutes(app, s);
   registerForwardAuthRoutes(app, s);
   await registerApi(app, s);

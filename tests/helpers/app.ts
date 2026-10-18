@@ -29,11 +29,14 @@ export interface TestContext {
   close(): Promise<void>;
 }
 
-export async function createTestContext(overrides: Partial<Config> = {}): Promise<TestContext> {
+export async function createTestContext(
+  overrides: Partial<Config> = {},
+  opts: { setupGate?: boolean } = {},
+): Promise<TestContext> {
   const tdb = await createTestDb();
   const services = createServices(testConfig({ databaseUrl: tdb.url, ...overrides }), tdb.db);
   await startServices(services);
-  const app = await buildApp(services);
+  const app = await buildApp(services, { setupGate: opts.setupGate ?? false });
   return {
     services,
     app,

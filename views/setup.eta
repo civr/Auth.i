@@ -1,0 +1,27 @@
+<% layout('layout') %>
+<h1>Set up Keystone</h1>
+<p class="muted">Find the setup code in the container log: <code>docker compose logs keystone</code></p>
+<% if (it.error) { %><p class="error" role="alert"><%= it.error %></p><% } %>
+<form method="post" action="/setup">
+  <input type="hidden" name="csrf" value="<%= it.csrf %>">
+  <label for="code">Setup code</label>
+  <input id="code" name="code" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX" required autofocus>
+  <label for="issuerUrl">Public URL</label>
+  <input id="issuerUrl" name="issuerUrl" value="<%= it.values.issuerUrl %>" <%= it.issuerLocked ? 'disabled' : 'required' %>>
+  <% if (it.issuerLocked) { %><p class="muted">Set by KEYSTONE_ISSUER_URL</p><% } %>
+  <% if (it.errors.issuerUrl) { %><p class="error"><%= it.errors.issuerUrl %></p><% } %>
+  <p class="muted">The address people open in the browser, for example https://auth.example.com.</p>
+  <label for="username">Admin username</label>
+  <input id="username" name="username" value="<%= it.values.username %>" autocomplete="username" required>
+  <% if (it.errors.username) { %><p class="error"><%= it.errors.username %></p><% } %>
+  <label for="email">Email</label>
+  <input id="email" name="email" type="email" value="<%= it.values.email %>" autocomplete="email" required>
+  <% if (it.errors.email) { %><p class="error"><%= it.errors.email %></p><% } %>
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" autocomplete="new-password" required>
+  <% if (it.errors.password) { %><p class="error"><%= it.errors.password %></p><% } %>
+  <label for="passwordConfirm">Repeat password</label>
+  <input id="passwordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" required>
+  <% if (it.errors.passwordConfirm) { %><p class="error"><%= it.errors.passwordConfirm %></p><% } %>
+  <button type="submit">Create admin and finish setup</button>
+</form>

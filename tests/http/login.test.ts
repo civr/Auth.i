@@ -157,7 +157,7 @@ describe('extra behaviours', () => {
 
   it('answers /healthz with 503 when the database is unreachable', async () => {
     const bad = createDb('postgres://nobody:nope@127.0.0.1:1/none');
-    const app = await buildApp({ ...ctx.services, db: bad });
+    const app = await buildApp({ ...ctx.services, db: bad }, { setupGate: false });
     try {
       const res = await app.inject({ method: 'GET', url: '/healthz' });
       expect(res.statusCode).toBe(503);
