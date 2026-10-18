@@ -15,11 +15,13 @@ services:
     image: keystone:local
     restart: unless-stopped
     environment:
-      KEYSTONE_ISSUER_URL: ${KEYSTONE_ISSUER_URL:-http://localhost:9000}
+      # All optional. Normally set the public URL, cookie domain, trusted proxies and log level in
+      # Keystone's Settings page (/admin/settings); a value set here overrides it and is shown locked.
+      KEYSTONE_ISSUER_URL: ${KEYSTONE_ISSUER_URL:-}
       KEYSTONE_COOKIE_DOMAIN: ${KEYSTONE_COOKIE_DOMAIN:-}
-      KEYSTONE_TRUST_PROXY: ${KEYSTONE_TRUST_PROXY:-loopback,linklocal,uniquelocal}
+      KEYSTONE_TRUST_PROXY: ${KEYSTONE_TRUST_PROXY:-}
       PORT: 9000
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_LEVEL: ${LOG_LEVEL:-}
       # Empty values are treated as unset. Without KEYSTONE_SECRET_KEY, the key is generated
       # once into the authi-data volume (secret.key).
       KEYSTONE_SECRET_KEY: ${KEYSTONE_SECRET_KEY:-}

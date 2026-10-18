@@ -20,11 +20,23 @@ const services = createServices(config, db, {
 });
 await startServices(services);
 
-const app = await buildApp(services, { logger: { level: config.logLevel } });
+const app = await buildApp(services, {
+  logger: { level: services.settings.current().logLevel },
+  onRestart: () => {
+    app.log.info('restart requested from admin settings');
+    void shutdown()
+      .catch((err) => app.log.error({ err }, 'shutdown failed'))
+      .finally(() => process.exit(0));
+  },
+});
 log = app.log;
 
 if ((await ensureBootstrapAdmin(services)) === 'created') {
   app.log.info({ username: config.bootstrapAdmin?.username }, 'bootstrap admin created');
+}
+if (await services.setup.isRequired()) {
+  const code = services.setup.issueCode();
+  app.log.warn(`Keystone setup code: ${code} — open ${services.settings.current().issuerUrl}/setup`);
 }
 const stopMaintenance = startMaintenance(services, (err) => app.log.error({ err }, 'maintenance failed'));
 

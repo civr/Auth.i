@@ -12,23 +12,23 @@ internet.
 
 ## Start
 
-No environment file is required for a fresh local deployment. To create the first admin on first
-start, pass the bootstrap variables (or put them in `.env`, see `.env.example`):
+No `.env` file is needed.
 
-```sh
-KEYSTONE_BOOTSTRAP_ADMIN_USER=admin KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD='choose-a-long-password' \
-  docker compose up -d --build
-docker compose ps
-curl http://127.0.0.1:9000/healthz
-docker compose exec keystone node dist/cli.js create-api-token laptop
-```
+1. `docker compose up -d --build`
+2. `docker compose logs keystone` and copy the line `Keystone setup code: XXXX-XXXX-XXXX-XXXX`
+3. Open `http://<host>:9000/setup` (or your public URL through the reverse proxy), enter the code,
+   the public URL and the first admin account.
+4. You land on **Settings** (`/admin/settings`) where you can change the public URL, cookie
+   domain, trusted proxies and log level at any time.
+
+A new setup code is printed on every start until setup is finished. Trusted-proxy changes need a
+restart (Settings shows a **Restart Keystone** button); everything else applies immediately.
 
 On first start, Compose creates a random Postgres password and Keystone creates a random encryption
 key. Both are kept in the persistent `authi-data` volume. Keystone applies its database migrations
-on every start. The bootstrap admin is created only while the database has no users; it never resets
-an existing password. The local issuer URL defaults to `http://localhost:9000`. The health endpoint
-returns `{"status":"ok"}` while Postgres is reachable and `503 {"status":"unavailable"}` otherwise.
-The app waits for Postgres's health check before starting. To inspect logs or stop the deployment:
+on every start. The health endpoint returns `{"status":"ok"}` while Postgres is reachable and
+`503 {"status":"unavailable"}` otherwise. The app waits for Postgres's health check before starting.
+To inspect logs or stop the deployment:
 
 ```sh
 docker compose logs -f keystone
@@ -42,10 +42,26 @@ that volume explicitly with `docker compose down --volumes`.
 client secrets undecryptable and Keystone will no longer start against that database. Do not set or
 change `KEYSTONE_SECRET_KEY` after first start for the same reason.
 
-Optional `.env` overrides are available for deployments behind a reverse proxy (see `.env.example`).
-Put Keystone behind your reverse proxy with TLS at `KEYSTONE_ISSUER_URL`. When reusing a database
-volume created by an older version, keep its original `POSTGRES_PASSWORD` available in `.env` so the
+Put Keystone behind your reverse proxy with TLS at your public URL. When reusing a database volume
+created by an older version, keep its original `POSTGRES_PASSWORD` available in `.env` so the
 generated password file matches it.
+
+## Advanced: environment overrides
+
+Everything on the Settings page can also be set with environment variables (in `.env`, see
+`.env.example`). A variable that is set overrides the Settings page, and the field is shown locked
+with the variable's name.
+
+| Variable | Setting |
+|---|---|
+| `KEYSTONE_ISSUER_URL` | Public URL (default `http://localhost:9000`) |
+| `KEYSTONE_COOKIE_DOMAIN` | Cookie domain (default unset) |
+| `KEYSTONE_TRUST_PROXY` | Trusted proxies (default `loopback,linklocal,uniquelocal`) |
+| `LOG_LEVEL` | Log level (default `info`) |
+
+`KEYSTONE_BOOTSTRAP_ADMIN_USER`, `KEYSTONE_BOOTSTRAP_ADMIN_PASSWORD` and
+`KEYSTONE_BOOTSTRAP_ADMIN_EMAIL` still create the first admin without the setup screen. Do not set or
+change `KEYSTONE_SECRET_KEY` after first start (see the backup note above).
 
 Admin commands run inside the container:
 
