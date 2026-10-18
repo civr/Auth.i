@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<% if (it.refresh) { %><meta http-equiv="refresh" content="<%= it.refresh %>"><% } %>
+<title><%= it.title %> · Keystone</title>
+<style>
+:root { color-scheme: light dark; --bg:#f5f6f8; --surface:#fff; --surface2:#f0f2f5; --line:#e2e5ea; --fg:#171b22; --muted:#586172; --accent:#2b59e8; --accent-soft:#e9efff; --ok:#18794e; --ok-soft:#e2f4ea; --warn:#9a5b00; --warn-soft:#fdf0d9; --danger:#c0362c; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0e1116; --surface:#161a21; --surface2:#1d222b; --line:#272d38; --fg:#e7eaf0; --muted:#a2aab8; --accent:#7092ff; --accent-soft:#1b2546; --ok:#4fc68f; --ok-soft:#12291e; --warn:#f0b34e; --warn-soft:#2e230f; --danger:#f2766b; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.top { display:flex; align-items:center; gap:12px; height:56px; padding:0 max(16px, env(safe-area-inset-left)); background:var(--surface); border-bottom:1px solid var(--line); }
+.brand { display:flex; align-items:center; gap:8px; font-weight:700; font-size:17px; color:var(--fg); text-decoration:none; }
+.brand svg { width:22px; height:22px; fill:var(--accent); }
+.top .who { margin-left:auto; display:flex; align-items:center; gap:12px; color:var(--muted); font-size:14px; }
+.top form { margin:0; }
+.shell { display:grid; grid-template-columns:220px minmax(0,1fr); min-height:calc(100vh - 56px); }
+nav { background:var(--surface); border-right:1px solid var(--line); padding:20px 12px; }
+nav .cap { margin:0 10px 6px; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; }
+nav a { display:block; padding:8px 10px; border-radius:6px; color:var(--muted); text-decoration:none; font-weight:500; }
+nav a.active { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+main { padding:32px clamp(16px,4vw,40px) 56px; min-width:0; }
+.page { max-width:720px; margin:0 auto; display:grid; gap:20px; }
+h1 { margin:0; font-size:26px; }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:20px; }
+.field { display:grid; gap:6px; padding:14px 0; border-top:1px solid var(--line); }
+.field:first-child { border-top:0; padding-top:0; }
+label { font-weight:600; font-size:14px; }
+input, select { width:100%; height:40px; padding:0 12px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:inherit; font:inherit; }
+input:disabled, select:disabled { background:var(--surface2); color:var(--muted); }
+.help { margin:0; color:var(--muted); font-size:13px; }
+.lock { color:var(--warn); font-size:13px; font-weight:600; }
+.error { margin:0; color:var(--danger); font-size:13px; }
+.notice { margin:0; padding:10px 12px; border-radius:6px; background:var(--ok-soft); color:var(--ok); }
+.notice.warn { background:var(--warn-soft); color:var(--warn); }
+button { height:40px; padding:0 16px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+button.secondary { background:var(--surface); color:var(--fg); border:1px solid var(--line); }
+.actions { display:flex; gap:8px; flex-wrap:wrap; padding-top:16px; }
+@media (max-width:760px) { .shell { grid-template-columns:minmax(0,1fr); } nav { border-right:0; border-bottom:1px solid var(--line); display:flex; gap:4px; padding:8px 12px; } nav .cap { display:none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/admin/settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-3.6 16H6.6z"/></svg>Keystone</a>
+  <div class="who"><span><%= it.user.username %></span><form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form></div>
+</header>
+<div class="shell">
+  <nav aria-label="Admin"><p class="cap">Admin</p><a href="/admin/settings" class="<%= it.active === 'settings' ? 'active' : '' %>">Settings</a></nav>
+  <main><div class="page"><%~ it.body %></div></main>
+</div>
+</body>
+</html>

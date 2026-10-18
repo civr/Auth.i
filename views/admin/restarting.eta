@@ -1,0 +1,7 @@
+<% layout('admin/layout') %>
+<h1>Restarting Keystone</h1>
+<% if (it.canRestart) { %>
+<p class="notice">Keystone is restarting. This page reloads in a few seconds.</p>
+<% } else { %>
+<p class="notice warn">Keystone is not running under a supervisor here. Start it again manually.</p>
+<% } %>

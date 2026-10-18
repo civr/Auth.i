@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <h1>Hi <%= it.user.displayName %></h1>
 <p class="muted">Signed in as <%= it.user.username %></p>
+<% if (it.user.isAdmin) { %><p><a href="/admin/settings">Admin settings</a></p><% } %>
 <% if (it.apps.length) { %>
 <ul class="apps">
   <% it.apps.forEach(function (app) { %><li><a href="<%= app.launchUrl %>"><%= app.name %></a></li><% }) %>

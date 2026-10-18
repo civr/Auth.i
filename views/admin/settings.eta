@@ -1,0 +1,25 @@
+<% layout('admin/layout') %>
+<h1>Settings</h1>
+<% it.notices.forEach(function (n) { %><p class="notice<%= n.indexOf('Saved.') === 0 ? '' : ' warn' %>" role="status"><%= n %></p><% }) %>
+<% if (it.restart) { %>
+<form method="post" action="/admin/restart"><input type="hidden" name="csrf" value="<%= it.csrf %>"><button type="submit">Restart Keystone</button></form>
+<% } %>
+<form class="panel" method="post" action="/admin/settings">
+  <input type="hidden" name="csrf" value="<%= it.csrf %>">
+  <% it.fields.forEach(function (f) { %>
+  <div class="field">
+    <label for="<%= f.key %>"><%= f.label %></label>
+    <% if (f.key === 'logLevel') { %>
+      <select id="logLevel" name="logLevel" <%= f.locked ? 'disabled' : '' %>>
+        <% it.logLevels.forEach(function (l) { %><option value="<%= l %>" <%= l === f.value ? 'selected' : '' %>><%= l %></option><% }) %>
+      </select>
+    <% } else { %>
+      <input id="<%= f.key %>" name="<%= f.key %>" value="<%= f.value %>" <%= f.locked ? 'disabled' : '' %>>
+    <% } %>
+    <% if (f.locked) { %><p class="lock">Set by <%= f.envVar %></p><% } %>
+    <% if (f.error) { %><p class="error" role="alert"><%= f.error %></p><% } %>
+    <p class="help"><%= f.help %></p>
+  </div>
+  <% }) %>
+  <div class="actions"><button type="submit">Save settings</button></div>
+</form>

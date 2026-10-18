@@ -10,6 +10,7 @@ import { registerApi } from '../api/plugin.js';
 import { AppError } from '../errors.js';
 import type { Services } from '../services.js';
 import { registerForwardAuthRoutes } from '../forward-auth/routes.js';
+import { registerAdminRoutes } from './admin-routes.js';
 import { registerInteractionRoutes } from './interaction-routes.js';
 import { registerLoginRoutes } from './login-routes.js';
 import { registerSetupGate, registerSetupRoutes } from './setup-routes.js';
@@ -119,6 +120,7 @@ export async function buildApp(s: Services, opts: BuildAppOptions = {}): Promise
 
   registerLoginRoutes(app, s);
   registerSetupRoutes(app, s);
+  registerAdminRoutes(app, s, { ...(opts.onRestart ? { onRestart: opts.onRestart } : {}) });
   registerInteractionRoutes(app, s);
   registerForwardAuthRoutes(app, s);
   await registerApi(app, s);
