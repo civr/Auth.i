@@ -7,12 +7,10 @@ import { renderPage } from './views.js';
 
 const FIELDS = ['code', 'issuerUrl', 'username', 'email', 'password', 'passwordConfirm'] as const;
 type SetupBody = Partial<Record<(typeof FIELDS)[number] | 'csrf', unknown>>;
-const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)?.split(',')[0]?.trim();
 
+/** req.protocol and req.host honour trustProxy (Fastify 5). */
 function detectedIssuer(req: FastifyRequest): string {
-  const proto = first(req.headers['x-forwarded-proto']) || req.protocol;
-  const host = first(req.headers['x-forwarded-host']) || req.headers.host || 'localhost:9000';
-  return `${proto}://${host}`;
+  return `${req.protocol}://${req.host || 'localhost:9000'}`;
 }
 
 /** While no user exists, pages go to /setup and machine endpoints answer 503. Register before middie. */
@@ -21,14 +19,11 @@ export function registerSetupGate(app: FastifyInstance, s: Services): void {
     const path = req.url.split('?')[0] ?? '/';
     if (path === '/setup' || path === '/healthz') return;
     if (!(await s.setup.isRequired())) return;
-    if (path.startsWith('/api/')) {
+    if (path.startsWith('/api/') || path.startsWith('/oidc') || path.startsWith('/outpost/')) {
       return reply
         .code(503)
         .type('application/problem+json')
         .send({ type: 'about:blank', title: 'Setup required', status: 503, detail: 'Finish setup at /setup first.' });
-    }
-    if (path.startsWith('/oidc') || path.startsWith('/outpost/')) {
-      return reply.code(503).send({ error: 'setup_required' });
     }
     return reply.redirect('/setup');
   });

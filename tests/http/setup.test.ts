@@ -83,6 +83,12 @@ describe('POST /setup', () => {
     expect(await ctx.services.users.count()).toBe(0);
   });
 
+  it('does not let one IP block setup for another', async () => {
+    for (let i = 0; i < 6; i++) await submit({ code: 'WRONG-CODE' }, '10.7.7.7');
+    const res = await submit({}, '10.8.8.8');
+    expect(res.statusCode).toBe(302);
+  });
+
   it('shows field errors for bad input', async () => {
     const res = await submit({ username: 'a b', password: 'short', passwordConfirm: 'short' });
     expect(res.statusCode).toBe(400);

@@ -183,6 +183,19 @@ export class SettingsService {
         errors.cookieDomain = (e as Error).message;
       }
     }
+    if (out.issuerUrl !== undefined && !errors.issuerUrl && out.cookieDomain === undefined) {
+      // The issuer changed but the cookie domain did not: the existing one must still cover the new host.
+      const effective = this.#value('cookieDomain');
+      if (effective) {
+        try {
+          normaliseCookieDomain(effective, out.issuerUrl);
+        } catch {
+          const host = hostOf(out.issuerUrl);
+          if (this.isLocked('cookieDomain')) errors.issuerUrl = 'Does not match KEYSTONE_COOKIE_DOMAIN';
+          else errors.cookieDomain = `Must be ${host} or a parent domain of it — update or clear it`;
+        }
+      }
+    }
     if (Object.keys(errors).length > 0) throw new SettingsValidationError(errors);
     return out;
   }

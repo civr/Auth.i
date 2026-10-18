@@ -66,7 +66,7 @@ export function createServices(
   const apps = new ApplicationService(db, box, groups);
   const apiTokens = new ApiTokenService(db);
   const keys = new SigningKeyService(db, keyBox);
-  const setup = new SetupService({ db, users, settings, audit }, new LoginRateLimiter(db, { maxPerIp: 5, maxPerUser: 1000 }));
+  const setup = new SetupService({ db, users, settings, audit }, new LoginRateLimiter(db, { maxPerIp: 5, maxPerUser: 5 }));
   const oidc = new OidcProviderHolder(() =>
     createOidcProvider({ config, db, users, groups, apps, sessions, keys, audit, settings }),
   );

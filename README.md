@@ -177,9 +177,15 @@ The preview server binds only to loopback.
 - `postgres`: Postgres 17; no host port is published, and persistent files live in `postgres-data`.
 
 Both services use a dedicated private bridge network. Change `KEYSTONE_HOST_PORT` if port 9000 is
-already occupied, and change `KEYSTONE_ISSUER_URL` to match (the issuer defaults to
+already occupied, and set the public URL in Settings (`/admin/settings`) (the issuer defaults to
 `http://localhost:9000`). Do not expose the service directly to the internet; terminate TLS at the existing
 reverse proxy.
+
+### Recovering from a wrong public URL
+
+If a wrong public URL (or `https://` over plain HTTP) locks you out, set `KEYSTONE_ISSUER_URL` (and/or
+`KEYSTONE_COOKIE_DOMAIN`) in the environment. The environment overrides the stored value. Sign in, fix
+the value in Settings, then remove the environment variable.
 
 ### Direct access on a LAN (no reverse proxy)
 

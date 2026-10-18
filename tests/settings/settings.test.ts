@@ -50,6 +50,24 @@ describe('SettingsService', () => {
     expect(events).toEqual([{ type: 'settings.changed', keys: expect.arrayContaining(['issuerUrl', 'cookieDomain']) }]);
   });
 
+  it('rejects an issuer change that the stored cookie domain no longer covers', async () => {
+    const s = make();
+    await s.load();
+    await s.update({ issuerUrl: 'https://auth.example.test', cookieDomain: 'example.test' }, actor);
+    await expect(s.update({ issuerUrl: 'https://auth.other.org' }, actor)).rejects.toMatchObject({
+      fieldErrors: { cookieDomain: expect.stringContaining('auth.other.org') },
+    });
+    expect(s.current().issuerUrl).toBe('https://auth.example.test');
+  });
+
+  it('puts the error on issuerUrl when the cookie domain is locked', async () => {
+    const s = make(['cookieDomain'], { cookieDomain: 'example.test' });
+    await s.load();
+    await expect(s.update({ issuerUrl: 'https://auth.other.org' }, actor)).rejects.toMatchObject({
+      fieldErrors: { issuerUrl: expect.stringContaining('KEYSTONE_COOKIE_DOMAIN') },
+    });
+  });
+
   it('lets env override the database and rejects updates to locked keys', async () => {
     const s = make(['issuerUrl'], { issuerUrl: 'https://env.example.test' });
     await s.load();

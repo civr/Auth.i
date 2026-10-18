@@ -36,6 +36,7 @@ if ((await ensureBootstrapAdmin(services)) === 'created') {
 }
 if (await services.setup.isRequired()) {
   const code = services.setup.issueCode();
+  console.warn(`Keystone setup code: ${code} — open ${services.settings.current().issuerUrl}/setup`);
   app.log.warn(`Keystone setup code: ${code} — open ${services.settings.current().issuerUrl}/setup`);
 }
 const stopMaintenance = startMaintenance(services, (err) => app.log.error({ err }, 'maintenance failed'));

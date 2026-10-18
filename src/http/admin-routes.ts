@@ -81,7 +81,9 @@ export function registerAdminRoutes(app: FastifyInstance, s: Services, opts: { o
     } catch (err) {
       if (!(err instanceof SettingsValidationError)) throw err;
       reply.code(400);
-      return render(req, reply, user, { values: patch, errors: err.fieldErrors });
+      const values: SettingsPatch = { ...patch };
+      for (const key of SETTING_KEYS) if (s.settings.isLocked(key)) delete values[key];
+      return render(req, reply, user, { values, errors: err.fieldErrors });
     }
     const { oidcReloadFailed } = await applySettingsChange(s, changed);
     if (changed.includes('logLevel')) app.log.level = s.settings.current().logLevel;

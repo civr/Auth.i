@@ -84,7 +84,7 @@ export class SetupService {
 
   async complete(input: SetupInput, ip: string): Promise<SetupResult> {
     if (!(await this.isRequired())) return { ok: false, reason: 'already_complete' };
-    const reservation = await this.limiter.reserve(`setup:${ip}`, 'setup');
+    const reservation = await this.limiter.reserve(`setup:${ip}`, `setup:${ip}`);
     if (reservation.blocked) return { ok: false, reason: 'rate_limited' };
     if (!this.#codeMatches(input.code)) return { ok: false, reason: 'bad_code' };
     const { errors, issuerUrl } = this.#validate(input);
@@ -111,7 +111,16 @@ export class SetupService {
     this.#codeHash = undefined;
     await this.limiter.release(reservation.ids);
     const actor = { type: 'user', id: outcome.id } as const;
-    const changed = issuerUrl ? await this.s.settings.update({ issuerUrl }, actor, ip) : [];
+    // The admin already exists and /setup is closed: a failure saving the URL must not turn into a 500.
+    // Swallow it so the admin is signed in and can fix the public URL in Settings.
+    let changed: SettingKey[] = [];
+    if (issuerUrl) {
+      try {
+        changed = await this.s.settings.update({ issuerUrl }, actor, ip);
+      } catch {
+        changed = [];
+      }
+    }
     await this.s.audit.record({ actor, action: 'setup.complete', target: outcome.id, ip });
     return { ok: true, user: outcome, changed };
   }
