@@ -4,7 +4,6 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-COPY scripts ./scripts
 RUN npm run build && npm prune --omit=dev
 
 FROM node:24-alpine
@@ -12,7 +11,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --from=build --chown=node:node /app/scripts ./scripts
+COPY --chown=node:node scripts/init-data.mjs ./scripts/init-data.mjs
 COPY --chown=node:node migrations ./migrations
 COPY --chown=node:node views ./views
 COPY --chown=node:node package.json ./

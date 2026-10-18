@@ -6,4 +6,8 @@ coverage
 dist
 docs
 node_modules
-tests
+testsdemo
+scripts/serve-mock.mjs
+docker-compose.test.yml
+vitest.config.ts
+*.md
