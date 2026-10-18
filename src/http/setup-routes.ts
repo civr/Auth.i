@@ -82,8 +82,8 @@ export function registerSetupRoutes(app: FastifyInstance, s: Services): void {
         return render(req, reply, { values, error: 'Too many attempts. Try again in 15 minutes.' });
       }
       reply.code(400);
-      if (result.reason === 'bad_code') return render(req, reply, { values, error: 'Setup code is incorrect.' });
-      return render(req, reply, { values, errors: result.fieldErrors });
+      if (result.reason === 'invalid') return render(req, reply, { values, errors: result.fieldErrors });
+      return render(req, reply, { values, error: 'Setup code is incorrect.' });
     }
     await applySettingsChange(s, result.changed);
     const { token } = await s.sessions.create(result.user.id, {
