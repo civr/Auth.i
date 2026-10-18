@@ -172,8 +172,8 @@ The preview server binds only to loopback.
 
 ## Service roles
 
-- `keystone`: non-root Node.js 24 service; HTTP port 9000 is published only on `127.0.0.1` for the
-  host's TLS reverse proxy.
+- `keystone`: non-root Node.js 24 service; HTTP port 9000 is published on all interfaces by default
+  (set `KEYSTONE_BIND_ADDRESS=127.0.0.1` to allow only a reverse proxy on the same host).
 - `postgres`: Postgres 17; no host port is published, and persistent files live in `postgres-data`.
 
 Both services use a dedicated private bridge network. Change `KEYSTONE_HOST_PORT` if port 9000 is
@@ -187,20 +187,21 @@ If a wrong public URL (or `https://` over plain HTTP) locks you out, set `KEYSTO
 `KEYSTONE_COOKIE_DOMAIN`) in the environment. The environment overrides the stored value. Sign in, fix
 the value in Settings, then remove the environment variable.
 
-### Direct access on a LAN (no reverse proxy)
+### Direct access by IP, then proxy-only
 
-By default the port only listens on `127.0.0.1`, so other machines cannot reach it. To open it by
-IP on a trusted local network, create `.env` next to `docker-compose.yml`:
+Out of the box Keystone listens on all interfaces, so you can open `http://<vm-ip>:9000/setup`
+right after `docker compose up -d`. This is plain HTTP: passwords and session cookies cross the
+network unencrypted, so use it only on a network you trust.
+
+Once a TLS reverse proxy runs on the same host, restrict Keystone to the proxy:
 
 ```sh
-KEYSTONE_BIND_ADDRESS=0.0.0.0
-KEYSTONE_ISSUER_URL=http://192.168.1.10:9000   # the address people type in the browser
+KEYSTONE_BIND_ADDRESS=127.0.0.1 docker compose up -d
 ```
 
-Then run `docker compose up -d`. This is plain HTTP, so passwords and session cookies cross the
-network unencrypted. Keystone also trusts `X-Forwarded-*` headers when it is reached directly.
-Use it only on a network you trust, and put a TLS reverse proxy or a Cloudflare Tunnel in front
-before you expose it to the internet.
+Use the same variable on every later `docker compose up`, or put the line
+`KEYSTONE_BIND_ADDRESS=127.0.0.1` in `.env`. Then set the public URL in Settings to the proxy's
+`https://` address.
 
 ## Development
 
