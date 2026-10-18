@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { SETTING_ENV, SETTING_KEYS, type SettingKey } from './settings/keys.js';
 
 const envSchema = z
   .object({
@@ -38,6 +39,7 @@ export interface Config {
   trustProxy: string;
   port: number;
   logLevel: string;
+  settingsFromEnv: ReadonlySet<SettingKey>;
 }
 
 function loadOrCreateSecretKey(dataDir: string): Buffer {
@@ -123,5 +125,6 @@ export function loadConfig(
     trustProxy: e.KEYSTONE_TRUST_PROXY,
     port: e.PORT,
     logLevel: e.LOG_LEVEL,
+    settingsFromEnv: new Set(SETTING_KEYS.filter((k) => present[SETTING_ENV[k]] !== undefined)),
   };
 }

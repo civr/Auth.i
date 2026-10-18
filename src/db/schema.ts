@@ -111,6 +111,13 @@ export interface LoginAttemptsTable {
   at: Generated<Date>;
 }
 
+export interface SettingsTable {
+  key: string;
+  value: ColumnType<unknown, string, string>;
+  updated_at: ColumnType<Date, Date | undefined, Date>;
+  updated_by: string | null;
+}
+
 export interface SchemaMigrationsTable {
   name: string;
   applied_at: Generated<Date>;
@@ -127,5 +134,6 @@ export interface Database {
   api_tokens: ApiTokensTable;
   audit_log: AuditLogTable;
   login_attempts: LoginAttemptsTable;
+  settings: SettingsTable;
   schema_migrations: SchemaMigrationsTable;
 }

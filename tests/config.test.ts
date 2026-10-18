@@ -86,6 +86,19 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...base, KEYSTONE_ISSUER_URL: 'http://localhost:9000' }).secureCookies).toBe(false);
   });
 
+  it('records which settings come from the environment', () => {
+    const tmp = mkdtempSync(path.join(tmpdir(), 'keystone-settings-env-'));
+    try {
+      const c = loadConfig(
+        { KEYSTONE_ISSUER_URL: 'https://a.example.test', LOG_LEVEL: 'debug', KEYSTONE_COOKIE_DOMAIN: '', DATABASE_URL: base.DATABASE_URL },
+        { dataDir: tmp },
+      );
+      expect([...c.settingsFromEnv].sort()).toEqual(['issuerUrl', 'logLevel']);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it('rejects non-http issuer URLs', () => {
     expect(() => loadConfig({ ...base, KEYSTONE_ISSUER_URL: 'ftp://auth.example.com' })).toThrow(/KEYSTONE_ISSUER_URL/);
   });

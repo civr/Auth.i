@@ -2,7 +2,8 @@ export type DomainEvent =
   | { type: 'user.created' | 'user.updated' | 'user.deactivated' | 'user.deleted'; userId: string }
   | { type: 'group.created' | 'group.updated'; groupId: string }
   | { type: 'group.deleted'; groupId: string; name: string }
-  | { type: 'group.members_changed'; groupId: string; userIds: string[] };
+  | { type: 'group.members_changed'; groupId: string; userIds: string[] }
+  | { type: 'settings.changed'; keys: string[] };
 
 export type EventHandler = (event: DomainEvent) => void | Promise<void>;
 

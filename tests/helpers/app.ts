@@ -18,6 +18,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     trustProxy: 'loopback',
     port: 9000,
     logLevel: 'silent',
+    settingsFromEnv: new Set(['issuerUrl', 'cookieDomain', 'trustProxy', 'logLevel'] as const),
     ...overrides,
   };
 }

@@ -25,6 +25,7 @@ describe('runMigrations', () => {
       'oidc_payloads',
       'schema_migrations',
       'sessions',
+      'settings',
       'signing_keys',
       'users',
     ]);
@@ -38,8 +39,8 @@ describe('runMigrations', () => {
   it('applies each migration once under concurrent runs', async () => {
     t = await createTestDb();
     await sql`DELETE FROM schema_migrations`.execute(t.db);
-    await sql`DROP TABLE users, groups, group_members, applications, sessions, oidc_payloads, signing_keys, api_tokens, audit_log, login_attempts CASCADE`.execute(t.db);
+    await sql`DROP TABLE users, groups, group_members, applications, sessions, oidc_payloads, signing_keys, api_tokens, audit_log, login_attempts, settings CASCADE`.execute(t.db);
     const results = await Promise.all([runMigrations(t.db), runMigrations(t.db), runMigrations(t.db)]);
-    expect(results.flat()).toEqual(['001_core.sql']);
+    expect(results.flat()).toEqual(['001_core.sql', '002_settings.sql']);
   });
 });
